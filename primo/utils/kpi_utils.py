@@ -85,7 +85,9 @@ def calculate_range(group: pd.DataFrame, column_name: str) -> float:
     return age_range
 
 
-def calculate_well_number(group: pd.DataFrame) -> int:
+def calculate_well_number(
+    group: pd.DataFrame, column_name: str = None, well_type: str = None
+) -> int:
     """
     Calculate the number of wells within a group.
 
@@ -93,13 +95,21 @@ def calculate_well_number(group: pd.DataFrame) -> int:
     ----------
     group : pd.DataFrame
         The group DataFrame
+    column_name : str
+        The name of the column that include the well type information
+    well_type : str
+        The type of well that would like to count the well number for
 
     Returns
     -------
     int
         The number of wells within the group
     """
-    return len(group)
+
+    if well_type:
+        return len(group[group[column_name] == well_type])
+    else:
+        return len(group)
 
 
 def calculate_average(
@@ -160,7 +170,9 @@ def calculate_number_of_owners(group: pd.DataFrame) -> int:
     return len(set(group["Operator Name"]))
 
 
-def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
+def process_data(
+    merged_df: pd.DataFrame, centroids: dict, model: str = "primo"
+) -> pd.DataFrame:
     """
     Process the merged DataFrame to compute various statistics for each project.
 
@@ -170,6 +182,10 @@ def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
         The merged DataFrame containing project data
     centroids : Dict
         A dictionary mapping project names to centroid coordinates
+    model : str
+        A str to indicate whether the application is "PRIMO" or "PRIMA".
+        The default model is "PRIMO"
+
 
     Returns
     -------
@@ -186,25 +202,11 @@ def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
         {"Project": average_age.index, "Average Age [Years]": average_age.values}
     )
 
-    average_depth = cluster_groups.apply(
-        calculate_average, column_name="Depth [ft]", include_groups=False
-    )
-    average_depth_df = pd.DataFrame(
-        {"Project": average_depth.index, "Average Depth [ft]": average_depth.values}
-    )
-
     age_ranges = cluster_groups.apply(
         calculate_range, column_name="Age [Years]", include_groups=False
     )
     age_ranges_df = pd.DataFrame(
         {"Project": age_ranges.index, "Age Range [Years]": age_ranges.values}
-    )
-
-    depth_ranges = cluster_groups.apply(
-        calculate_range, column_name="Depth [ft]", include_groups=False
-    )
-    depth_ranges_df = pd.DataFrame(
-        {"Project": depth_ranges.index, "Depth Range [ft]": depth_ranges.values}
     )
 
     well_number = cluster_groups.apply(calculate_well_number, include_groups=False)
@@ -250,13 +252,6 @@ def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
         }
     )
 
-    number_of_owners = cluster_groups.apply(
-        calculate_number_of_owners, include_groups=False
-    )
-    number_of_owners_df = pd.DataFrame(
-        {"Project": number_of_owners.index, "Operator Name": number_of_owners.values}
-    )
-
     average_priority_score = cluster_groups.apply(
         calculate_average, column_name="Priority Score [0-100]", include_groups=False
     )
@@ -271,7 +266,6 @@ def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
         "Project": list(centroids.keys()),
         "Project Centroid": list(centroids.values()),
         "Number of Wells": well_number_df["Average Well Score"].tolist(),
-        "Number of Unique Owners": number_of_owners_df["Operator Name"].tolist(),
         "Average Elevation Delta [m]": elevation_average_df[
             "Average Elevation Delta [m]"
         ].tolist(),
@@ -283,12 +277,66 @@ def process_data(merged_df: pd.DataFrame, centroids: dict) -> pd.DataFrame:
         ].tolist(),
         "Age Range [Years]": age_ranges_df["Age Range [Years]"].tolist(),
         "Average Age [Years]": average_age_df["Average Age [Years]"].tolist(),
-        "Depth Range [ft]": depth_ranges_df["Depth Range [ft]"].tolist(),
-        "Average Depth [ft]": average_depth_df["Average Depth [ft]"].tolist(),
         "Impact Score [0-100]": average_priority_score_df[
             "Average Priority Score [0-100]"
         ].tolist(),
     }
+
+    if model == "prima" or model == "PRIMA":
+        uow_number = cluster_groups.apply(
+            calculate_well_number,
+            column_name="Well Status",
+            well_type="UOW",
+            include_groups=False,
+        )
+        uow_number_df = pd.DataFrame(
+            {
+                "Project": uow_number.index,
+                "Number of UOWs in Project": uow_number.values,
+            }
+        )
+        new_data.update(
+            {
+                "Number of UOWs in Project": uow_number_df[
+                    "Number of UOWs in Project"
+                ].tolist()
+            }
+        )
+
+        "Well Age [years]"
+    else:
+        average_depth = cluster_groups.apply(
+            calculate_average, column_name="Depth [ft]", include_groups=False
+        )
+        average_depth_df = pd.DataFrame(
+            {"Project": average_depth.index, "Average Depth [ft]": average_depth.values}
+        )
+
+        depth_ranges = cluster_groups.apply(
+            calculate_range, column_name="Depth [ft]", include_groups=False
+        )
+        depth_ranges_df = pd.DataFrame(
+            {"Project": depth_ranges.index, "Depth Range [ft]": depth_ranges.values}
+        )
+
+        number_of_owners = cluster_groups.apply(
+            calculate_number_of_owners, include_groups=False
+        )
+        number_of_owners_df = pd.DataFrame(
+            {
+                "Project": number_of_owners.index,
+                "Operator Name": number_of_owners.values,
+            }
+        )
+        new_data.update(
+            {
+                "Number of Unique Owners": number_of_owners_df[
+                    "Operator Name"
+                ].tolist(),
+                "Depth Range [ft]": depth_ranges_df["Depth Range [ft]"].tolist(),
+                "Average Depth [ft]": average_depth_df["Average Depth [ft]"].tolist(),
+            }
+        )
 
     new_df = pd.DataFrame(new_data)
     return new_df

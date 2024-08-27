@@ -143,4 +143,13 @@ def parse_args(args_list: Union[None, List[str]]) -> argparse.Namespace:
         required=False,
         help="Should logging output be displayed on console",
     )
+
+    parser.add_argument(
+        "-m",
+        "--max_number_uows",
+        action="store",
+        type=float,
+        required=False,
+        help="The max number of uows that can be inspected",
+    )
     return parser.parse_args(args_list)
