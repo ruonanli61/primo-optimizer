@@ -38,6 +38,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/utils/kpi_utils.py": 7,
     "primo/utils/map_utils.py": 40,
     "primo/utils/opt_utils.py": 5,
+    "primo/utils/override_utils.py": 5,
     "primo/utils/proximity_to_sensitive_receptors.py": 4,
     "primo/utils/proximity_utils.py": 5,
     "primo/utils/setup_arg_parser.py": 9,
