@@ -28,6 +28,7 @@ LONG_DESCRIPTION = (CURRENT_DIRECTORY / "README.md").read_text()
 REQUIREMENTS = [
     "appengine-python-standard",
     "censusgeocode",
+    "fast_autocomplete",
     "folium",
     "geopandas",
     "gurobipy",

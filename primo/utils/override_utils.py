@@ -13,7 +13,8 @@
 
 # Installed lib
 from fast_autocomplete import AutoComplete
-from IPython.display import Javascript, display
+from haversine import haversine_vector, Unit
+from IPython.display import display
 import ipywidgets as widgets
 import pandas as pd
 
@@ -83,9 +84,6 @@ class overridewidget:
         # convert nested list to flat list
         values = list(sorted(set(str(item) for sublist in values for item in sublist)))
 
-        # remove previous options from tag `<datalist>` in HTML
-        # display(Javascript(""" document.querySelector("datalist").innerHTML = "" """))
-
         self.widget.options = values
 
     def _on_button_clicked_add(self, _):
@@ -154,9 +152,10 @@ class recalculate:
         well_df: pd.DataFrame,
         mobilization_costs,
         budget,
-        dac_weight,
-        dac_budget_fraction,
         max_wells_per_owner,
+        max_distance,
+        dac_weight=None,
+        dac_budget_fraction=None,
     ):
         self.original_well_list = original_well_list
         self.well_add_list = well_add_list
@@ -167,6 +166,7 @@ class recalculate:
         self.dac_weight = dac_weight
         self.dac_budget_fraction = dac_budget_fraction
         self.max_wells_per_owner = max_wells_per_owner
+        self.max_distance = max_distance
 
         for well_id in self.well_add_list:
             well_id = int(well_id)
@@ -224,5 +224,37 @@ class recalculate:
         for operator, groups in self.well_return_df.groupby("Operator Name"):
             n_wells = len(groups)
             if n_wells > self.max_wells_per_owner:
-                self.violate_operator[operator] = n_wells
+                self.violate_operator[operator] = [
+                    n_wells,
+                    groups["API Well Number"].to_list(),
+                ]
+
         return self.violate_operator
+
+    def distance_asses(self):
+        self.violate_distance = {}
+        for cluster_id, groups in self.well_return_df.groupby("Project"):
+            well_id = list(groups["API Well Number"])
+            num_well = len(well_id)
+            groups["coor"] = list(zip(groups.Latitude, groups.Longitude))
+            distance_metric_distance = haversine_vector(
+                groups["coor"].to_list(),
+                groups["coor"].to_list(),
+                unit=Unit.MILES,
+                comb=True,
+            )
+            well_distance = {}
+            for well_1 in range(num_well - 1):
+                for well_2 in range(well_1 + 1, num_well):
+                    well_distance = distance_metric_distance[well_1][well_2]
+                    if well_distance > self.max_distance:
+                        self.violate_distance[
+                            (cluster_id, well_id[well_1], well_id[well_2])
+                        ] = [
+                            cluster_id,
+                            well_id[well_1],
+                            well_id[well_2],
+                            well_distance,
+                        ]
+
+        return self.violate_distance
