@@ -12,44 +12,51 @@
 #################################################################################
 
 # Standard libs
-from typing import Dict, List, Union
+import logging
 
-# Installed libs
+# Installed lib
+
 from fast_autocomplete import AutoComplete
 from haversine import haversine_vector, Unit
 from IPython.display import display
 import ipywidgets as widgets
 import pandas as pd
+from typing import Dict, List, Union
 
-# User defined libs
+
+# User defined lib
+from primo.data_parser.data_model import OptInputs
 from primo.utils.raise_exception import raise_exception
 
+LOGGER = logging.getLogger(__name__)
 
-class overridewidget:
+
+# pylint: disable = attribute-defined-outside-init
+class OverrideWidget:
     """
-    Class for displaying a autofill widget in the Jupyter Notebook to allow user select
-    wells would like to add to or remove from the optimal solution
+    Class for displaying an autofill widget in Jupyter Notebook that allows the user select
+    wells that they would like to add to or remove from the optimal solution
 
     Parameters
     ----------
 
     well_df : pd.DataFrame
-        A DataFrame containing wells from which users can select wells to be added
-        to or removed from the optimization result
+        Data frame of all wells
 
     Attributes
     ----------
 
     widget : widgets.Combobox
-        A text widget with autofill functionality that enables users to select wells
-        to be included in the well_list
+
+        A text widget with autofill feature for selecting wells for `well_list`
 
     button : widgets.Button
-        A button used to confirm and add the selected well to the well_list
+        A button to confirm and add the selected well to `well_list`
 
     well_list : list
-        A list containing the API well numbers of wells to be added to or removed
-        from the optimization result
+        A list containing the API well number of wells that the user would like to add to
+        or remove from the result of the optimization problem
+
     """
 
     def __init__(self, well_df: pd.DataFrame, button_description: str):
@@ -57,7 +64,6 @@ class overridewidget:
 
         words = well_dict
         self.autocomplete = AutoComplete(words=words)
-        layout = widgets.Layout(width="auto", height="auto")
         self.widget = widgets.Combobox(
             value="",
             placeholder="Select well",
@@ -102,7 +108,7 @@ class overridewidget:
             )
         else:
             self.well_list.append(self.text)
-            print(f"Well {self.text} has been added to the override list.")
+            LOGGER.info(f"Well {self.text} has been added to the override list.")
 
     def _on_button_clicked_remove(self, _) -> None:
         """
@@ -117,7 +123,7 @@ class overridewidget:
             )
         else:
             self.well_list.remove(self.text)
-            print(f"Well {self.text} has been removed from the list.")
+            LOGGER.info(f"Well {self.text} has been removed from the list.")
 
     def display(self) -> widgets.HBox:
         """
@@ -133,20 +139,21 @@ class overridewidget:
         return self.well_list
 
 
-def UserInput(well_df_add: pd.DataFrame, well_df_remove: pd.DataFrame):
+def user_input(well_df_add: pd.DataFrame, well_df_remove: pd.DataFrame):
     """
     A wrapper for generating a widget that facilitates the addition and removal of wells
 
     """
-    widget_add = overridewidget(well_df_add, "Add the well to the suggested projects")
-    widget_remove = overridewidget(
+    widget_add = OverrideWidget(well_df_add, "Add the well to the suggested projects")
+    widget_remove = OverrideWidget(
         well_df_remove, "Remove the well from the suggested projects"
     )
 
     return widget_add, widget_remove
 
 
-class recalculate:
+class Recalculate:
+  
     """
     Class for assess whether whether the overridden P&A projects adhere to the constraints
     defined in the optimization problem
@@ -216,23 +223,19 @@ class recalculate:
         well_add_list: list,
         well_remove_list: list,
         well_df: pd.DataFrame,
-        mobilization_costs: Dict[int, float],
-        budget: int,
-        max_wells_per_owner: int,
-        max_distance: int,
-        dac_weight: int = None,
-        dac_budget_fraction: int = None,
+        opt_inputs: OptInputs,
+        dac_weight: float = None,
     ):
         self.original_well_list = original_well_list
         self.well_add_list = well_add_list
         self.well_remove_list = well_remove_list
         self.well_df = well_df
-        self.mobilization_costs = mobilization_costs
-        self.budget = budget
+        self.mobilization_costs = opt_inputs.mobilization_cost
+        self.budget = opt_inputs.budget
+        self.dac_budget_fraction = opt_inputs.dac_budget_fraction
+        self.max_wells_per_owner = opt_inputs.max_wells_per_owner
+        self.max_distance = opt_inputs.distance_threshold
         self.dac_weight = dac_weight
-        self.dac_budget_fraction = dac_budget_fraction
-        self.max_wells_per_owner = max_wells_per_owner
-        self.max_distance = max_distance
 
         for well_id in self.well_add_list:
             well_id = int(well_id)
@@ -241,11 +244,11 @@ class recalculate:
 
         well_remove_list = [int(well_id) for well_id in self.well_remove_list]
         self.original_well_list["drop"] = self.original_well_list.apply(
-            lambda row: "0" if row["API Well Number"] in well_remove_list else "1",
+            lambda row: 0 if row["API Well Number"] in well_remove_list else 1,
             axis=1,
         )
         self.well_return_df = self.original_well_list[
-            self.original_well_list["drop"] == "1"
+            self.original_well_list["drop"] == 1
         ]
 
     def budget_assess(self) -> Union[int, bool]:
