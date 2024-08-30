@@ -15,11 +15,14 @@
 import logging
 
 # Installed lib
+
 from fast_autocomplete import AutoComplete
 from haversine import haversine_vector, Unit
 from IPython.display import display
 import ipywidgets as widgets
 import pandas as pd
+from typing import Dict, List, Union
+
 
 # User defined lib
 from primo.data_parser.data_model import OptInputs
@@ -44,6 +47,7 @@ class OverrideWidget:
     ----------
 
     widget : widgets.Combobox
+
         A text widget with autofill feature for selecting wells for `well_list`
 
     button : widgets.Button
@@ -52,6 +56,7 @@ class OverrideWidget:
     well_list : list
         A list containing the API well number of wells that the user would like to add to
         or remove from the result of the optimization problem
+
     """
 
     def __init__(self, well_df: pd.DataFrame, button_description: str):
@@ -75,9 +80,9 @@ class OverrideWidget:
         self.button_remove.on_click(self._on_button_clicked_remove)
         self.well_list = []
 
-    def _on_change(self, data):
+    def _on_change(self, data) -> None:
         """
-        Dynamically update the well option list in the drop down section of the widget
+        Dynamically update the well option in the drop down list of the widget
         based on the information user has already typed in
         """
 
@@ -90,10 +95,10 @@ class OverrideWidget:
 
         self.widget.options = values
 
-    def _on_button_clicked_add(self, _):
+    def _on_button_clicked_add(self, _) -> None:
         """
-        Add the selected well to the well_list and print the corresponding message in
-        the Jupyter Notebook
+        Add the selected well to the well_list and print the corresponding confirmation
+        message in the Jupyter Notebook
         """
 
         if self.text in self.well_list:
@@ -105,10 +110,10 @@ class OverrideWidget:
             self.well_list.append(self.text)
             LOGGER.info(f"Well {self.text} has been added to the override list.")
 
-    def _on_button_clicked_remove(self, _):
+    def _on_button_clicked_remove(self, _) -> None:
         """
-        Remove a selected well from the well_list and print the corresponding message in
-        the Jupyter Notebook
+        Remove a selected well from the well_list and display the corresponding
+        confirmation message in the Jupyter Notebook
         """
 
         if self.text not in self.well_list:
@@ -120,14 +125,14 @@ class OverrideWidget:
             self.well_list.remove(self.text)
             LOGGER.info(f"Well {self.text} has been removed from the list.")
 
-    def display(self):
+    def display(self) -> widgets.HBox:
         """
-        display the widget and button in the Jupyter Notebook
+        Display the widget and button in the Jupyter Notebook
         """
         buttons = widgets.HBox([self.button_add, self.button_remove])
         display(self.widget, buttons)
 
-    def return_value(self):
+    def return_value(self) -> List:
         """
         Return the list of selected wells
         """
@@ -136,7 +141,7 @@ class OverrideWidget:
 
 def user_input(well_df_add: pd.DataFrame, well_df_remove: pd.DataFrame):
     """
-    A wrapper to generate the override widget for adding wells and removing wells
+    A wrapper for generating a widget that facilitates the addition and removal of wells
 
     """
     widget_add = OverrideWidget(well_df_add, "Add the well to the suggested projects")
@@ -148,6 +153,70 @@ def user_input(well_df_add: pd.DataFrame, well_df_remove: pd.DataFrame):
 
 
 class Recalculate:
+  
+    """
+    Class for assess whether whether the overridden P&A projects adhere to the constraints
+    defined in the optimization problem
+
+    Parameters
+    ----------
+
+    original_well_list : pd.DataFrame
+        A DataFrame containing wells selected based on solving the optimization problem
+        without considering the override wells.
+
+    well_add_list : list
+        A list of wells that the user wishes to add to the P&A projects
+
+    well_remove_list : list
+        A list of wells that the user wishes to remove from the P&A projects
+
+    well_df : pd.DataFrame
+        A DataFrame that includes all candidate wells
+
+    mobilization_costs : Dict[int, float]
+        A dictionary mapping well IDs to mobilization costs. These costs should match
+        those used in the optimization problem.
+
+    budget : int
+        An integer for the available budget for plugging wells
+
+    max_wells_per_owner : int
+        An integer for the maximum number of wells an owner can have in the overall
+        P&A projects. This value should align with the one used in the optimization problem.
+
+    max_distance : int
+        An integer for the maximum allowable distance between two wells within the
+        same project. This value should match the one used in the optimization problem.
+
+    dac_weight : int
+        An integer for the weight assigned to the DAC priority factor.
+
+    dac_budget_fraction : int
+        An integer for the minimum percentage of wells to be plugged that should
+        be located in DAC areas. This value should align with the one used in the
+        optimization problem.
+
+    Attributes
+    ----------
+
+    violate_cost : Union[int, bool]
+        The actual budget if the budget constraint is violated; otherwise False
+
+    violate_dac : Union[int, bool]
+        The actual DAC percentage if the DAC constraint is violated otherwise False
+
+    violate_operator : dict
+        A dictionary providing information on owners who exceed the well count constraint.
+        Includes owner name, the number of wells belonging to the owner in the project,
+        and the specific well IDs.
+
+    violate_distance : dict
+        A dictionary detailing wells that breach the maximum distance constraint.
+        Includes the project, well pairs, and the actual distances between these well pairs.
+
+    """
+
     def __init__(
         self,
         original_well_list: pd.DataFrame,
@@ -155,7 +224,7 @@ class Recalculate:
         well_remove_list: list,
         well_df: pd.DataFrame,
         opt_inputs: OptInputs,
-        dac_weight: float,
+        dac_weight: float = None,
     ):
         self.original_well_list = original_well_list
         self.well_add_list = well_add_list
@@ -182,7 +251,10 @@ class Recalculate:
             self.original_well_list["drop"] == 1
         ]
 
-    def budget_assess(self):
+    def budget_assess(self) -> Union[int, bool]:
+        """
+        Assess whether the budget constraint is violated or not
+        """
         total_cost = 0
         for _, groups in self.well_return_df.groupby("Project"):
             n_wells = len(groups)
@@ -194,7 +266,10 @@ class Recalculate:
             self.violate_cost = False
         return self.violate_cost
 
-    def dac_assess(self):
+    def dac_assess(self) -> Union[int, bool]:
+        """
+        Assess whether the DAC constraint is violated or not
+        """
         for _, row in self.well_return_df.iterrows():
             well_id = row["API Well Number"]
             if self.dac_weight is not None:
@@ -219,7 +294,10 @@ class Recalculate:
             self.violate_dac = False
         return self.violate_dac
 
-    def operator_assess(self):
+    def operator_assess(self) -> Dict:
+        """
+        Assess whether the owner well count constraint is violated or not
+        """
         self.violate_operator = {}
         for operator, groups in self.well_return_df.groupby("Operator Name"):
             n_wells = len(groups)
@@ -231,7 +309,10 @@ class Recalculate:
 
         return self.violate_operator
 
-    def distance_asses(self):
+    def distance_asses(self) -> Dict:
+        """
+        Assess whether the maximum distance between two wells constraint is violated or not
+        """
         self.violate_distance = {}
         for cluster_id, groups in self.well_return_df.groupby("Project"):
             well_id = list(groups["API Well Number"])
