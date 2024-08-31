@@ -13,6 +13,7 @@
 
 # Standard libs
 import logging
+from typing import Dict, List, Union
 
 # Installed lib
 
@@ -21,12 +22,12 @@ from haversine import haversine_vector, Unit
 from IPython.display import display
 import ipywidgets as widgets
 import pandas as pd
-from typing import Dict, List, Union
 
 
 # User defined lib
 from primo.data_parser.data_model import OptInputs
 from primo.utils.raise_exception import raise_exception
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,7 +154,6 @@ def user_input(well_df_add: pd.DataFrame, well_df_remove: pd.DataFrame):
 
 
 class Recalculate:
-  
     """
     Class for assess whether whether the overridden P&A projects adhere to the constraints
     defined in the optimization problem
@@ -239,8 +239,10 @@ class Recalculate:
 
         for well_id in self.well_add_list:
             well_id = int(well_id)
-            well_add = self.well_df[self.well_df["API Well Number"] == well_id]
-            self.original_well_list = pd.concat([self.original_well_list, well_add])
+            self.well_add = self.well_df[self.well_df["API Well Number"] == well_id]
+            self.original_well_list = pd.concat(
+                [self.original_well_list, self.well_add]
+            )
 
         well_remove_list = [int(well_id) for well_id in self.well_remove_list]
         self.original_well_list["drop"] = self.original_well_list.apply(
@@ -339,3 +341,39 @@ class Recalculate:
                         ]
 
         return self.violate_distance
+
+
+def back_fill(selected_well, well, well_remove_list_well, well_gdf, opt_inputs_well):
+    violation = Recalculate(
+        selected_well, [well], well_remove_list_well, well_gdf, opt_inputs_well
+    )
+    violate_cost = violation.budget_assess()
+    violate_operator = violation.operator_assess()
+    violate_distance = violation.distance_asses()
+    if (
+        violate_cost is False
+        and bool(violate_operator) is False
+        and bool(violate_distance) is False
+    ):
+        return [well]
+
+
+def well_candidates_list(
+    well_violate, well_gdf, selected_well, well_remove_list_well, opt_inputs_well
+):
+    well_candidates_dict = {}
+    for well_id in well_violate:
+        well_backfill = []
+        cluster = int(well_gdf[well_gdf["API Well Number"] == well_id]["Project"])
+        well_candidates = well_gdf[
+            (well_gdf["Project"] == str(cluster))
+            & (well_gdf["API Well Number"] != well_id)
+        ]["API Well Number"]
+        for well in well_candidates:
+            well_candidate = back_fill(
+                selected_well, well, well_remove_list_well, well_gdf, opt_inputs_well
+            )
+            if well_candidate is not None:
+                well_backfill += well_candidate
+        well_candidates_dict[well_id] = well_backfill
+    return well_candidates_dict
