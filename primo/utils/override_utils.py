@@ -343,9 +343,20 @@ class Recalculate:
         return self.violate_distance
 
 
-def back_fill(selected_well, well, well_remove_list_well, well_gdf, opt_inputs_well):
+def back_fill(
+    selected_well,
+    well_add_list_well,
+    well_remove_list_well,
+    well_gdf,
+    opt_inputs_well,
+    well,
+):
     violation = Recalculate(
-        selected_well, [well], well_remove_list_well, well_gdf, opt_inputs_well
+        selected_well,
+        well_add_list_well,
+        well_remove_list_well,
+        well_gdf,
+        opt_inputs_well,
     )
     violate_cost = violation.budget_assess()
     violate_operator = violation.operator_assess()
@@ -359,7 +370,12 @@ def back_fill(selected_well, well, well_remove_list_well, well_gdf, opt_inputs_w
 
 
 def well_candidates_list(
-    well_violate, well_gdf, selected_well, well_remove_list_well, opt_inputs_well
+    well_violate,
+    well_gdf,
+    selected_well,
+    well_add_list_well,
+    well_remove_list_well,
+    opt_inputs_well,
 ):
     well_candidates_dict = {}
     for well_id in well_violate:
@@ -370,8 +386,17 @@ def well_candidates_list(
             & (well_gdf["API Well Number"] != well_id)
         ]["API Well Number"]
         for well in well_candidates:
+            well_add_list_well_drop = [
+                int(id) for id in well_add_list_well if int(id) not in well_violate
+            ]
+            well_add_list_well_drop += [well]
             well_candidate = back_fill(
-                selected_well, well, well_remove_list_well, well_gdf, opt_inputs_well
+                selected_well,
+                well_add_list_well_drop,
+                well_remove_list_well,
+                well_gdf,
+                opt_inputs_well,
+                well,
             )
             if well_candidate is not None:
                 well_backfill += well_candidate
