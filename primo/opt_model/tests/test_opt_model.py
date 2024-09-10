@@ -24,10 +24,12 @@ from primo.opt_model.opt_model import OptModel
 from primo.utils.setup_arg_parser import parse_args
 
 
-@pytest.fixture
-def opt_model_inputs():
+# Test the scenario with sufficient budget for plugging all wells
+# and the scenario without sufficient budget for plugging all wells
+@pytest.fixture(params=[20000000, 90000])
+def opt_model_inputs(request):
     # Settings for sample
-    oil_budget = 20000000
+    oil_budget = request.param
     verbose_output = 0
     max_wells_per_owner = 2
     dac_percent = 50
@@ -108,7 +110,11 @@ def test_build_opt_model(opt_model_inputs):
 # Integration testing for solving the optimization model
 @pytest.mark.parametrize(
     "solver,lazy_constraints",
-    [("highs", 0), ("gurobi", 0), ("gurobi_persistent", 1)],
+    [
+        ("highs", 0),
+        ("gurobi", 0),
+        ("gurobi_persistent", 1),
+    ],
 )
 def test_solve_opt_model(opt_model_inputs, solver, lazy_constraints):
 
