@@ -430,8 +430,8 @@ class OptModel(BaseModel):
 
         def budget_constraint_slack(model):
             """
-            Ensure at least a certain percentage of the total budget
-            needs to be spent to avoid the scenario where there is no
+            Implement a slack variable to maximize the utilization of the total budget.
+            The constraint intends to avoid the scenario where there is no
             wells being selected.
 
             Parameters
