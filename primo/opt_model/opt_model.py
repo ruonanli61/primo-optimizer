@@ -138,6 +138,13 @@ class OptModel(BaseModel):
             within=pyo.Reals,
         )
 
+        model.p_v_s = pyo.Param(
+            doc="A value used for scaling the budget slack variable",
+            initialize=model_inputs.scaling_budget_slack,
+            mutable=False,
+            within=pyo.PositiveReals,
+        )
+
         LOGGER.info("Finished initializing parameters")
 
     def _add_variables(self):
@@ -155,6 +162,7 @@ class OptModel(BaseModel):
                 campaign_set.append((campaign_id, n_well))
 
         model.v_q = pyo.Var(campaign_set, within=pyo.Binary)
+        model.B_slack = pyo.Var(within=pyo.NonNegativeReals)
         LOGGER.info("Finished adding variables")
 
     def _add_constraints(
@@ -419,6 +427,38 @@ class OptModel(BaseModel):
                 doc="Define limit on max project spend",
             )
             LOGGER.info("Added max project spend constraint")
+
+        def budget_constraint_slack(model):
+            """
+            Ensure at least a certain percentage of the total budget
+            needs to be spent to avoid the scenario where there is no
+            wells being selected.
+
+            Parameters
+            ----------
+            model : pyo.ConcreteModel
+                The optimization model.
+
+            Returns
+            -------
+            pyo.Constraint
+            """
+            return (
+                model.p_B
+                - sum(
+                    model.v_q[cluster, n_well] * model.p_c[n_well]
+                    for (cluster, n_well) in model.v_q.index_set()
+                )
+                <= model.B_slack
+            )
+
+        model.con_budget_slack = pyo.Constraint(
+            rule=budget_constraint_slack,
+            doc="A slack variable for unused budget",
+        )
+
+        LOGGER.info("Added a budget constraint to force as much as budget being used")
+
         LOGGER.info("Finished adding constraints")
 
     def _set_objective(self):
@@ -441,7 +481,10 @@ class OptModel(BaseModel):
             pyo.Expression :
                 The expression representing the objective function.
             """
-            return sum(model.v_y[w] * model.p_v[w] for w in model.s_w)
+            return (
+                sum(model.v_y[w] * model.p_v[w] for w in model.s_w)
+                - model.p_v_s * model.B_slack
+            )
 
         model.obj = pyo.Objective(rule=obj, sense=pyo.maximize)
 

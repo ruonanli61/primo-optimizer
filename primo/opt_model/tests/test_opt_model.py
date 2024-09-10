@@ -94,12 +94,14 @@ def test_build_opt_model(opt_model_inputs):
     assert isinstance(model.model.p_B, pyo.Param)
     assert isinstance(model.model.p_v, pyo.Param)
     assert isinstance(model.model.p_owc, pyo.Param)
+    assert isinstance(model.model.p_v_s, pyo.Param)
     assert isinstance(model.model.v_y, pyo.Var)
     assert isinstance(model.model.v_q, pyo.Var)
     assert isinstance(model.model.con_budget, pyo.Constraint)
     assert isinstance(model.model.owner_well_count, pyo.Constraint)
     assert isinstance(model.model.con_balanced_budgets, pyo.Constraint)
     assert isinstance(model.model.con_project_max_spend, pyo.Constraint)
+    assert isinstance(model.model.con_budget_slack, pyo.Constraint)
     assert isinstance(model.model.obj, pyo.Objective)
 
 

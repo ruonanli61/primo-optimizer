@@ -112,6 +112,7 @@ class OptInputs:
         "max_wells_per_owner",
         "dac_budget_fraction",
         "distance_threshold",
+        "scaling_budget_slack",
     )
     well_dict: Dict[str, Well]
     campaign_candidates: Dict[str, CampaignCandidates]
@@ -121,6 +122,7 @@ class OptInputs:
     max_wells_per_owner: float
     dac_budget_fraction: float
     distance_threshold: float
+    scaling_budget_slack: float
 
     def __post_init__(self):
         """

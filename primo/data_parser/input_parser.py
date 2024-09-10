@@ -100,6 +100,24 @@ class InputParser:
             self.well_data.groupby("Operator Name")["Well ID"].apply(list).to_dict()
         )
 
+        # estimate the maximum number of wells can be plugged with the budget.
+        unit_cost = max(mobilization_cost.values()) / max(
+            mobilization_cost, key=mobilization_cost.get
+        )
+        max_well_num = budget / unit_cost
+        # calculate the scaling factor for the budget slack variable if the
+        # budget is not sufficient to plug all wells
+        if max_well_num < len(self.well_data):
+            scaling_budget_slack = (
+                max_well_num * self.well_data["Priority Score [0-100]"].max()
+            ) / budget
+        # calculate the scaling factor for the budget slack variable if the
+        # budget is sufficient to plug all wells
+        else:
+            scaling_budget_slack = (
+                len(self.well_data) * self.well_data["Priority Score [0-100]"].max()
+            ) / budget
+
         dac_weight = self.args.dac_weight
 
         if self.args.dac_weight_percent is not None:
@@ -160,4 +178,5 @@ class InputParser:
             max_wells_per_owner,
             dac_budget_fraction,
             distance_threshold,
+            scaling_budget_slack,
         )
