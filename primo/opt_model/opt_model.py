@@ -142,13 +142,13 @@ class OptModel(BaseModel):
             model_inputs, objective_weights
         )
         model.p_B_sl = pyo.Param(
-            doc="A value used to scale the budget slack variable",
+            doc="Budget slack variable coefficient in the objective function",
             initialize=scaling_factor,
             mutable=False,
             within=pyo.PositiveReals,
         )
         model.p_B_s = pyo.Param(
-            doc="A value indicating whether the budget is sufficient to plug all wells",
+            doc="Whether the budget is sufficient to plug all wells",
             initialize=int(budget_sufficient),
             mutable=False,
             within=pyo.NonNegativeReals,
@@ -463,7 +463,7 @@ class OptModel(BaseModel):
 
         model.con_budget_slack = pyo.Constraint(
             rule=budget_constraint_slack,
-            doc="Constraint to calculate the unutilized amount of budget",
+            doc="Calculate the unutilized amount of budget",
         )
         LOGGER.info("Added a constraint to calculate the unutilized amount of budget")
 
@@ -498,7 +498,7 @@ class OptModel(BaseModel):
             )
 
         LOGGER.info(
-            "Added a constraint to ensure that at least 50% of the budget is used when the total budget is sufficient to plug all wells."
+            "Added a constraint to ensure that at least 50 percent of the budget is used when the total budget is sufficient to plug all wells."
         )
 
         LOGGER.info("Finished adding constraints")
