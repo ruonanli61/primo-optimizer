@@ -27,7 +27,7 @@ from primo.data_parser.data_model import OptInputs
 from primo.opt_model import FEASIBILITY_TOLERANCE
 from primo.opt_model.base_model import BaseModel
 from primo.utils import check_optimal_termination, get_solver
-from primo.utils.opt_utils import is_pyomo_model_feasible
+from primo.utils.opt_utils import budget_slack_variable_scaling, is_pyomo_model_feasible
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
@@ -138,11 +138,20 @@ class OptModel(BaseModel):
             within=pyo.Reals,
         )
 
-        model.p_v_s = pyo.Param(
-            doc="A value used for scaling the budget slack variable",
-            initialize=model_inputs.scaling_budget_slack,
+        scaling_factor, budget_sufficient = budget_slack_variable_scaling(
+            model_inputs, objective_weights
+        )
+        model.p_B_sl = pyo.Param(
+            doc="A value used to scale the budget slack variable",
+            initialize=scaling_factor,
             mutable=False,
             within=pyo.PositiveReals,
+        )
+        model.p_B_s = pyo.Param(
+            doc="A value indicating whether the budget is sufficient to plug all wells",
+            initialize=int(budget_sufficient),
+            mutable=False,
+            within=pyo.NonNegativeReals,
         )
 
         LOGGER.info("Finished initializing parameters")
@@ -162,7 +171,7 @@ class OptModel(BaseModel):
                 campaign_set.append((campaign_id, n_well))
 
         model.v_q = pyo.Var(campaign_set, within=pyo.Binary)
-        model.B_slack = pyo.Var(within=pyo.NonNegativeReals)
+        model.v_B_slack = pyo.Var(within=pyo.NonNegativeReals)
         LOGGER.info("Finished adding variables")
 
     def _add_constraints(
@@ -430,9 +439,9 @@ class OptModel(BaseModel):
 
         def budget_constraint_slack(model):
             """
-            Implement a slack variable to maximize the utilization of the total budget.
-            The constraint intends to avoid the scenario where there is no
-            wells being selected.
+            Implements a constraint that calculates the unutilized
+            amount of the available budget.
+
 
             Parameters
             ----------
@@ -449,15 +458,48 @@ class OptModel(BaseModel):
                     model.v_q[cluster, n_well] * model.p_c[n_well]
                     for (cluster, n_well) in model.v_q.index_set()
                 )
-                <= model.B_slack
+                <= model.v_B_slack
             )
 
         model.con_budget_slack = pyo.Constraint(
             rule=budget_constraint_slack,
-            doc="A slack variable for unused budget",
+            doc="Constraint to calculate the unutilized amount of budget",
         )
+        LOGGER.info("Added a constraint to calculate the unutilized amount of budget")
 
-        LOGGER.info("Added a budget constraint to force as much as budget being used")
+        if model.p_B_s == 0:
+
+            def min_budget_usage(model):
+                """
+                Implements a constraint to ensure at least 50% of the
+                budget is used when the budget is sufficient to
+                plug all wells.
+
+                Parameters
+                ----------
+                model : pyo.ConcreteModel
+                    The optimization model.
+
+                Returns
+                -------
+                pyo.Constraint
+                """
+                return (
+                    sum(
+                        model.v_q[cluster, n_well] * model.p_c[n_well]
+                        for (cluster, n_well) in model.v_q.index_set()
+                    )
+                    >= 0.5 * model.p_B
+                )
+
+            model.con_min_budget = pyo.Constraint(
+                rule=min_budget_usage,
+                doc="Enforces a minimum budget usage of 50%",
+            )
+
+        LOGGER.info(
+            "Added a constraint to ensure that at least 50% of the budget is used when the total budget is sufficient to plug all wells."
+        )
 
         LOGGER.info("Finished adding constraints")
 
@@ -483,7 +525,7 @@ class OptModel(BaseModel):
             """
             return (
                 sum(model.v_y[w] * model.p_v[w] for w in model.s_w)
-                - model.p_v_s * model.B_slack
+                - model.p_B_sl * model.v_B_slack
             )
 
         model.obj = pyo.Objective(rule=obj, sense=pyo.maximize)

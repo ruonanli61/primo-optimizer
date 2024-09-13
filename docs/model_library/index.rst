@@ -52,7 +52,7 @@ Optimization Model Notation
         * - :math:`\textcolor{brown}{mc^i}`
           - The mobilization cost for a project assuming the number of wells is :math:`\textcolor{blue}{i}`
         * - :math:`\textcolor{brown}{VS}`
-          - The scaling factor for the slack variable :math:`\textcolor{red}{S_{b}}` associated with the minimum budget constraint
+          - The scaling factor for the slack variable :math:`\textcolor{red}{SLB}` associated with the minimum budget constraint
 
 
 .. list-table:: **Binary Variables**
@@ -185,7 +185,7 @@ The constraint described by equation :eq:`eq:sym2` ensures that the largest proj
 
 **Budget usage**
 
-The constraint defined by equation :eq:`eq:minb` is implemented to ensure that as much of the budget as possible is utilized.
+The constraint defined by equation :eq:`eq:minb` ensures that the remaining excess budget is accurately calculated.
 
 .. math::
         :label: eq:minb
