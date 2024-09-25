@@ -263,7 +263,7 @@ class CheckBoxWidget:
         The horizontal box that contains the checkbox and slider appended together
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         description: str,
         default: int,
@@ -473,6 +473,26 @@ class UserPriorities:
         self.sub_priorities_ = {}
         self.validate_ = validate
         self.confirm_button_.on_click(self.confirm_weights)
+
+        # A mapping to keep track of arbitrary objects that are mapped to
+        # and from widget labels
+        self._to_widget_labels = {}
+        self._from_widget_labels = {}
+
+    def get_widget_label_maps(self) -> Tuple[dict, dict]:
+        """
+        Gets the widget label maps that are used to keep track of widget labels with arbitrary
+        objects
+        """
+        return (self._to_widget_labels, self._from_widget_labels)
+
+    def set_widget_label_maps(self, to_widget_labels: dict, from_widget_labels: dict):
+        """
+        Sets the widget label maps that are used to keep track of widget labels with
+        arbitrary objects
+        """
+        self._to_widget_labels = to_widget_labels
+        self._from_widget_labels = from_widget_labels
 
     def validate(self) -> bool:
         """

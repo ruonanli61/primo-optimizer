@@ -13,7 +13,7 @@
 
 # Standard libs
 import logging
-from typing import Union
+from typing import Callable, Dict, Optional
 
 # Installed libs
 import numpy as np
@@ -21,28 +21,29 @@ import pandas as pd
 from pyomo.common.config import Bool, ConfigValue
 
 # User-defined libs
-from primo.data_parser.default_data import SUPP_EFF_METRICS, SUPP_IMPACT_METRICS
+from primo.data_parser.default_data import (
+    SUPP_EFF_METRICS,
+    SUPP_IMPACT_METRICS,
+    _SupportedContent,
+)
 from primo.utils.config_utils import UserPriorities
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable = protected-access, logging-fstring-interpolation
-# pylint: disable = too-many-arguments
-# pylint: disable = too-many-instance-attributes
-class Metric:
+class Metric:  # pylint: disable=too-many-instance-attributes
     """
     Dataclass for creating metric objects
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         name: str,
         weight: int,
         min_weight: int = 0,
         max_weight: int = 100,
-        full_name: Union[str, None] = None,
+        full_name: Optional[str] = None,
     ) -> None:
         """
         Returns a `Metric` object
@@ -115,7 +116,7 @@ class Metric:
         return self._name
 
     @name.setter
-    def name(self, val):
+    def name(self, val: str):
         """Setter for attribute `name`"""
         if hasattr(self, "_name"):
             raise_exception(
@@ -138,7 +139,7 @@ class Metric:
         return self._weight
 
     @weight.setter
-    def weight(self, val):
+    def weight(self, val: int):
         """Setter for attribute `weight`"""
         if not isinstance(val, int):
             LOGGER.warning(
@@ -189,7 +190,7 @@ class Metric:
         """Setter for the _fill_missing_value attribute."""
         self._fill_missing_value.set_value(value)
 
-    def _configure_fill_missing_value(self, domain, default=None):
+    def _configure_fill_missing_value(self, domain: Callable, default=None):
         """
         Sets the domain validator and default value for `fill_missing_value` for
         supported metrics/submetrics
@@ -219,14 +220,14 @@ class SubMetric(Metric):
     Dataclass for creating submetric objects
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         name: str,
         parent_metric: Metric,
         weight: int,
         min_weight: int = 0,
         max_weight: int = 100,
-        full_name: Union[str, None] = None,
+        full_name: Optional[str] = None,
     ) -> None:
         """
         Returns a `SubMetric` object
@@ -288,11 +289,10 @@ class SetOfMetrics:
         # Makes the object iterable! Iterate over all Metric and SubMetric objects.
         return iter(self.__dict__.values())
 
-    # pylint: disable = consider-iterating-dictionary
     def __contains__(self, var):
-        return var in self.__dict__.keys() or var in [obj.full_name for obj in self]
+        return var in self.__dict__ or var in [obj.full_name for obj in self]
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Metric):
         if not isinstance(value, Metric):
             msg = (
                 f"Attributes of {self.__class__.__name__} must be instances of Metric. "
@@ -380,7 +380,9 @@ class SetOfMetrics:
 
         return _extended_metrics
 
-    def register_new_metric(self, name, weight=0, full_name=None):
+    def register_new_metric(
+        self, name: str, weight: int = 0, full_name: Optional[str] = None
+    ):
         """
         Registers a new metric
 
@@ -397,7 +399,7 @@ class SetOfMetrics:
         """
         setattr(self, name, Metric(name=name, weight=weight, full_name=full_name))
 
-    def delete_metric(self, name):
+    def delete_metric(self, name: str):
         """
         Deletes an existing metric
 
@@ -421,7 +423,13 @@ class SetOfMetrics:
 
         delattr(self, obj.name)
 
-    def register_new_submetric(self, name, parent_metric, weight=0, full_name=None):
+    def register_new_submetric(
+        self,
+        name: str,
+        parent_metric: Metric,
+        weight: int = 0,
+        full_name: Optional[str] = None,
+    ):
         """
         Registers a new submetric
 
@@ -457,7 +465,7 @@ class SetOfMetrics:
         else:
             parent_metric.submetrics = {obj.name: obj}
 
-    def delete_submetric(self, name):
+    def delete_submetric(self, name: str):
         """
         Deletes an existing submetric
 
@@ -481,7 +489,12 @@ class SetOfMetrics:
         if len(parent_obj.submetrics) == 0:
             delattr(parent_obj, "submetrics")
 
-    def set_weight(self, primary_metrics, submetrics=None, check_validity=True):
+    def set_weight(
+        self,
+        primary_metrics: Dict[str, int],
+        submetrics: Optional[Dict[str, Dict[str, int]]] = None,
+        check_validity: bool = True,
+    ):
         """
         Sets/updates the weights of all metrics/submetrics.
 
@@ -489,7 +502,7 @@ class SetOfMetrics:
         ----------
         primary_metrics : dict
             Dictionary containing the weights of primary metrics.
-            key must be the primary metric's `name` and the value
+            key must be the `name` of the primary metric and the value
             must be its weight. Submetrics can also be included in this
             dictionary.
 
@@ -563,7 +576,7 @@ class SetOfMetrics:
                 )
                 raise_exception(msg, ValueError)
 
-    def build_widget(self, increments=1):
+    def build_widget(self, increments: int = 1):
         """
         Builds a widget to for visualizing and updating metrics
 
@@ -613,12 +626,10 @@ class SetOfMetrics:
             counter += 1
 
         _widget = UserPriorities(widget_data)
-        _widget._to_widget_labels = _to_widget_labels
-        _widget._from_widget_labels = _from_widget_labels
-
+        _widget.set_widget_label_maps(_to_widget_labels, _from_widget_labels)
         return _widget
 
-    def set_weight_from_widget(self, widget_obj):
+    def set_weight_from_widget(self, widget_obj: UserPriorities):
         """
         Updates the weight from the widget to the data object
 
@@ -633,7 +644,8 @@ class SetOfMetrics:
         for key in sub_priority_weights:
             priority_weights.update(sub_priority_weights[key])
 
-        for key, obj in widget_obj._from_widget_labels.items():
+        _, from_widget_labels = widget_obj.get_widget_label_maps()
+        for key, obj in from_widget_labels.items():
             if key in priority_weights:
                 obj.weight = priority_weights[key]
             else:
@@ -645,10 +657,15 @@ class SetOfMetrics:
 class ImpactMetrics(SetOfMetrics):
     """Set of supported impact metrics"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, impact_metrics: Optional[Dict[str, _SupportedContent]] = None
+    ) -> None:
         super().__init__()
 
-        for val in SUPP_IMPACT_METRICS.values():
+        if impact_metrics is None:
+            impact_metrics = SUPP_IMPACT_METRICS
+
+        for val in impact_metrics.values():
             if not val.is_submetric:
                 self.register_new_metric(
                     name=val.name,
@@ -672,10 +689,14 @@ class ImpactMetrics(SetOfMetrics):
 class EfficiencyMetrics(SetOfMetrics):
     """Set of supported efficiency metrics"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, efficiency_metrics: Optional[Dict[str, _SupportedContent]] = None
+    ) -> None:
         super().__init__()
+        if efficiency_metrics is None:
+            efficiency_metrics = SUPP_EFF_METRICS
 
-        for val in SUPP_EFF_METRICS.values():
+        for val in efficiency_metrics.values():
             self.register_new_metric(
                 name=val.name,
                 full_name=val.full_name,

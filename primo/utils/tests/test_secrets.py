@@ -135,7 +135,7 @@ def test_get_nearest_road_point(lat, lon, return_tuple, status):
 @pytest.mark.parametrize(
     "lat, lon, return_value, status",
     [  # Case 1: pass case
-        (40.4309, -79.739699, 0.033497882662451864, True),
+        (40.4309, -79.739699, 0.03349586324778641, True),
         # Case 2: missing data
         (
             np.nan,

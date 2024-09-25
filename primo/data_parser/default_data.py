@@ -13,7 +13,7 @@
 
 # Standard libs
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional, Union
 
 # Installed libs
 from pyomo.common.config import Bool, NonNegativeFloat, NonNegativeInt
@@ -22,9 +22,9 @@ from pyomo.common.config import Bool, NonNegativeFloat, NonNegativeInt
 FEASIBILITY_TOLERANCE = 1e-6  # Optimization Feasibility tolerance
 EARTH_RADIUS = 3959.0  # Earth's radius in Miles
 CENSUS_YEAR = 2020
-CONVERSION_FACTOR = 5.614583  # convert bbl of oil to mcf of gas
+CONVERSION_FACTOR = 5.614583  # convert Bbl of oil to Mcf of gas
 BING_MAPS_BASE_URL = "http://dev.virtualearth.net/REST/V1/Routes/Driving"
-# Fixed start coordinates in elevation util to get nearest road point
+# Fixed start coordinates in elevation utility to get nearest road point
 START_COORDINATES = (40.44, -79.94)
 
 
@@ -37,15 +37,15 @@ class _SupportedContent:
     full_name: str
     has_submetrics: bool = False
     is_submetric: bool = False
-    parent_metric: Union[str, None] = None
+    parent_metric: Optional[str] = None
     # required_data: keys in WellDataColumnNames class
     # This will be used to check if the input data has
     # required columns or not.
-    required_data: Union[str, list, None] = None
-    # Is the value of this metric inversly proportional to plugging priority?
+    required_data: Optional[Union[str, list]] = None
+    # Is the value of this metric inversely proportional to plugging priority?
     # E.g., Compliance, production volume, etc.
     has_inverse_priority: bool = False
-    fill_missing_value: Union[None, dict] = None
+    fill_missing_value: Optional[dict] = None
 
 
 SUPP_IMPACT_METRICS = {
@@ -159,7 +159,7 @@ SUPP_IMPACT_METRICS = {
         # If it is not specified, set the state DAC priority to zero
         fill_missing_value={"domain": NonNegativeFloat, "default": 0},
     ),
-    # Submetrics of sensitive_recptors
+    # Submetrics of sensitive_receptors
     "hospitals": _SupportedContent(
         name="hospitals",
         full_name="Hospitals",

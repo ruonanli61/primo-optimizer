@@ -14,7 +14,7 @@
 # Standard libs
 import logging
 from dataclasses import InitVar, dataclass
-from typing import Union
+from typing import Dict, Optional
 
 # User-defined libs
 from primo.data_parser import ImpactMetrics
@@ -23,11 +23,8 @@ from primo.utils.raise_exception import raise_exception
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable = too-many-instance-attributes
-# pylint: disable = trailing-whitespace, protected-access
-# pylint: disable = logging-fstring-interpolation
 @dataclass
-class WellDataColumnNames:
+class WellDataColumnNames:  # pylint: disable=too-many-instance-attributes
     """
     Dataclass for storing column names
     """
@@ -38,45 +35,45 @@ class WellDataColumnNames:
     longitude: str
     age: str
     depth: str
-    operator_name: Union[str, None] = None
+    operator_name: Optional[str] = None
 
     # Columns for ch4_emissions metric
-    leak: Union[str, None] = None
-    compliance: Union[str, None] = None
-    violation: Union[str, None] = None
-    incident: Union[str, None] = None
+    leak: Optional[str] = None
+    compliance: Optional[str] = None
+    violation: Optional[str] = None
+    incident: Optional[str] = None
 
     # Columns for dac_impact metric. fed_dac will be calculated
-    state_dac: Union[str, None] = None
+    state_dac: Optional[str] = None
 
     # Columns for sensitive_receptors metric
-    hospitals: Union[str, None] = None
-    schools: Union[str, None] = None
-    buildings_near: Union[str, None] = None
-    buildings_far: Union[str, None] = None
+    hospitals: Optional[str] = None
+    schools: Optional[str] = None
+    buildings_near: Optional[str] = None
+    buildings_far: Optional[str] = None
 
     # Columns for environment metric
-    fed_wetlands_near: Union[str, None] = None
-    fed_wetlands_far: Union[str, None] = None
-    state_wetlands_near: Union[str, None] = None
-    state_wetlands_far: Union[str, None] = None
+    fed_wetlands_near: Optional[str] = None
+    fed_wetlands_far: Optional[str] = None
+    state_wetlands_near: Optional[str] = None
+    state_wetlands_far: Optional[str] = None
 
     # Columns for production_volume metric
-    well_type: Union[str, None] = None  # Oil/Gas Type
-    well_type_by_depth: Union[str, None] = None  # Shallow/Deep Type
-    ann_gas_production: Union[str, None] = None
-    ann_oil_production: Union[str, None] = None
-    five_year_gas_production: Union[str, None] = None
-    five_year_oil_production: Union[str, None] = None
-    life_gas_production: Union[str, None] = None
-    life_oil_production: Union[str, None] = None
+    well_type: Optional[str] = None  # Oil/Gas Type
+    well_type_by_depth: Optional[str] = None  # Shallow/Deep Type
+    ann_gas_production: Optional[str] = None
+    ann_oil_production: Optional[str] = None
+    five_year_gas_production: Optional[str] = None
+    five_year_oil_production: Optional[str] = None
+    life_gas_production: Optional[str] = None
+    life_oil_production: Optional[str] = None
 
     # Columns for other_emissions metric
-    h2s_leak: Union[str, None] = None
-    brine_leak: Union[str, None] = None
+    h2s_leak: Optional[str] = None
+    brine_leak: Optional[str] = None
 
     # Columns for well_integrity metric
-    well_integrity: Union[str, None] = None
+    well_integrity: Optional[str] = None
 
     # Additional user-specific columns
     additional_columns: InitVar[dict] = {}
@@ -92,7 +89,7 @@ class WellDataColumnNames:
         # Iterate over all attributes/columns
         return iter(self.__dict__)
 
-    def register_new_columns(self, col_names: dict):
+    def register_new_columns(self, col_names: Dict[str, str]):
         """Registers an attribute for a new column"""
         for key, val in col_names.items():
             if key in self:
@@ -122,7 +119,6 @@ class WellDataColumnNames:
         data = {key: val for key, val in self.__dict__.items() if val is not None}
         return data.items()
 
-    # pylint: disable = logging-fstring-interpolation
     def check_columns_available(
         self,
         impact_metrics: ImpactMetrics,
@@ -136,6 +132,7 @@ class WellDataColumnNames:
         impact_metrics : ImpactMetrics
             Impact Metrics object
         """
+        # pylint: disable=protected-access
         im_wt = impact_metrics
 
         for obj in im_wt:

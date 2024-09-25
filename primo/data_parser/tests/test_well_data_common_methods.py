@@ -22,7 +22,7 @@ import pytest
 
 # User-defined libs
 from primo.data_parser.well_data import WellData
-from primo.data_parser.well_data_column_names import WellDataColumnNames
+from primo.data_parser.well_data_columns import WellDataColumnNames
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,8 +40,6 @@ INCOMPLETE_ROWS = {
 }
 
 
-# pylint: disable = missing-function-docstring, protected-access
-# pylint: disable = unused-variable
 @pytest.fixture(name="get_well_data_from_csv", scope="function")
 def get_well_data_from_csv_fixture():
     """Returns well data from a csv file"""
@@ -65,7 +63,7 @@ def get_well_data_from_csv_fixture():
     )
 
     wd = WellData(
-        filename=filename,
+        data=filename,
         column_names=col_names,
         preliminary_data_check=False,
     )
@@ -81,14 +79,14 @@ def test_excel_reader(tmp_path, get_well_data_from_csv):
 
     # Read the excel file from the temp folder
     wd_xlsx = WellData(
-        filename=str(filename),
+        data=str(filename),
         column_names=wd_csv._col_names,
         preliminary_data_check=False,
     )
 
     pd.testing.assert_frame_equal(wd_csv.data, wd_xlsx.data)
-    assert wd_csv.data.shape[0] == 50
-    assert wd_xlsx.data.shape[0] == 50
+    assert len(wd_csv) == 50
+    assert len(wd_xlsx) == 50
 
 
 def test_unsupported_file_error():
@@ -105,7 +103,10 @@ def test_unsupported_file_error():
         TypeError,
         match="Unsupported input file format. Only .xlsx, .xls, and .csv are supported.",
     ):
-        wd = WellData(filename="file.foo", column_names=col_names)
+        wd = WellData(data="file.foo", column_names=col_names)
+
+    with pytest.raises(TypeError, match="Unknown variable type for input data"):
+        wd = WellData(data=5, column_names=col_names)
 
 
 # Test dunder methods
@@ -113,7 +114,7 @@ def test_dunder_methods(get_well_data_from_csv):
     wd = get_well_data_from_csv
 
     # Testing the __contains__ dunder method
-    for col in wd._col_names.values():
+    for col in wd.col_names.values():
         assert col in wd
 
     # The data file has two additional columns. Ensure that
@@ -124,6 +125,10 @@ def test_dunder_methods(get_well_data_from_csv):
     # Testing the __iter__ dunder method
     # list(wd) generates the list of rows in wd.data
     assert list(wd) == list(range(2, 52))
+
+    # Testing the __getitem__ dunder method
+    assert wd[wd.col_names.age] is wd.data[wd.col_names.age]
+    assert wd[wd.col_names.depth] is wd.data[wd.col_names.depth]
 
 
 def test_has_incomplete_data(caplog, get_well_data_from_csv):
@@ -162,7 +167,7 @@ def test_drop_incomplete_data(caplog, get_well_data_from_csv):
         assert isinstance(wd.data.loc[i, col_names.well_id], str)
 
     assert (
-        f"Removed a few wells because {col_names.well_id} information "
+        f"Removed wells because {col_names.well_id} information "
         f"is not available for them."
     ) in caplog.text
 
@@ -180,7 +185,7 @@ def test_drop_incomplete_data(caplog, get_well_data_from_csv):
         assert i not in wd.data.index
 
     assert (
-        f"Removed a few wells because {col_names.latitude} information "
+        f"Removed wells because {col_names.latitude} information "
         f"is not available for them."
     ) in caplog.text
 

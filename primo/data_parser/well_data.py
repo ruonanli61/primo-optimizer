@@ -15,182 +15,29 @@
 import copy
 import logging
 import math
-from typing import Union
+import pathlib
+from typing import Optional, Union
 
 # Installed libs
 import numpy as np
 import pandas as pd
-from pyomo.common.config import (
-    Bool,
-    ConfigDict,
-    ConfigValue,
-    In,
-    NonNegativeFloat,
-    document_kwargs_from_configdict,
-)
+from pyomo.common.config import Bool, document_kwargs_from_configdict
 
 # User-defined libs
 from primo.data_parser import ImpactMetrics
 from primo.data_parser.default_data import CONVERSION_FACTOR
-from primo.data_parser.well_data_column_names import WellDataColumnNames
-from primo.utils.domain_validators import InRange
+from primo.data_parser.input_config import data_config
+from primo.data_parser.well_data_columns import WellDataColumnNames
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
 
-# Input options for well data class
-CONFIG = ConfigDict()
-CONFIG.declare(
-    "census_year",
-    ConfigValue(
-        default=2020,
-        domain=In(list(range(2020, 2101, 10))),
-        doc="Year for collecting census data",
-    ),
-)
-CONFIG.declare(
-    "preliminary_data_check",
-    ConfigValue(
-        default=True, domain=Bool, doc="If True, performs preliminary data checks."
-    ),
-)
-CONFIG.declare(
-    "ignore_operator_name",
-    ConfigValue(
-        default=True,
-        domain=Bool,
-        doc="Remove well if operator name is not provided",
-    ),
-)
-CONFIG.declare(
-    "missing_age",
-    ConfigValue(
-        default="fill",
-        domain=In(["fill", "estimate", "remove"]),
-        doc="Method for processing missing age information",
-    ),
-)
-CONFIG.declare(
-    "missing_depth",
-    ConfigValue(
-        default="fill",
-        domain=In(["fill", "estimate", "remove"]),
-        doc="Method for processing missing depth information",
-    ),
-)
-CONFIG.declare(
-    "fill_age",
-    ConfigValue(
-        default=100,
-        # Assuming that no well is older than 350 years
-        domain=InRange(0, 350),
-        doc="Value to fill with, if the age is missing",
-    ),
-)
-CONFIG.declare(
-    "fill_depth",
-    ConfigValue(
-        default=1000,
-        # Assuming that no well is deeper than 40,000 ft
-        domain=InRange(0, 40000),
-        doc="Value to fill with, if the depth is missing",
-    ),
-)
-CONFIG.declare(
-    "fill_well_type",
-    ConfigValue(
-        default="Oil",
-        domain=In(["Oil", "Gas"]),
-        doc="Well-type assumption if it is not specified",
-    ),
-)
-CONFIG.declare(
-    "fill_well_type_depth",
-    ConfigValue(
-        default="Deep",
-        domain=In(["Deep", "Shallow"]),
-        doc="Well-type (by depth) assumption if it is not specified",
-    ),
-)
-CONFIG.declare(
-    "fill_ann_gas_production",
-    ConfigValue(
-        default=0.0,
-        domain=NonNegativeFloat,
-        doc=(
-            "Value to fill with, if the annual gas production "
-            "[in Mcf/Year] is not specified"
-        ),
-    ),
-)
-CONFIG.declare(
-    "fill_ann_oil_production",
-    ConfigValue(
-        default=0.0,
-        domain=NonNegativeFloat,
-        doc=(
-            "Value to fill with, if the annual oil production "
-            "[in bbl/Year] is not specified."
-        ),
-    ),
-)
-CONFIG.declare(
-    "fill_life_gas_production",
-    ConfigValue(
-        default=0.0,
-        domain=NonNegativeFloat,
-        doc=(
-            "Value to fill with, if the lifelong gas production [in Mcf] "
-            "is not specified"
-        ),
-    ),
-)
-CONFIG.declare(
-    "fill_life_oil_production",
-    ConfigValue(
-        default=0.0,
-        domain=NonNegativeFloat,
-        doc=(
-            "Value to fill with, if the lifelong oil production [in bbl] "
-            "is not specified"
-        ),
-    ),
-)
-CONFIG.declare(
-    "threshold_gas_production",
-    ConfigValue(
-        domain=NonNegativeFloat,
-        doc=(
-            "If specified, wells whose lifelong gas production volume [in Mcf] is "
-            "above the threshold production volume will be removed from the dataset."
-        ),
-    ),
-)
-CONFIG.declare(
-    "threshold_oil_production",
-    ConfigValue(
-        domain=NonNegativeFloat,
-        doc=(
-            "If specified, wells whose lifelong oil production volume [in bbl] is "
-            "above the threshold production volume will be removed from the dataset."
-        ),
-    ),
-)
-CONFIG.declare(
-    "threshold_depth",
-    ConfigValue(
-        domain=NonNegativeFloat,
-        doc="Threshold depth [in ft] for classifying a well as shallow or deep",
-    ),
-)
+CONFIG = data_config()
 
 
-# pylint: disable = too-many-instance-attributes
-# pylint: disable = trailing-whitespace, protected-access
-# pylint: disable = logging-fstring-interpolation
 class WellData:
     """
-    Reads, processes, and anlyzes well data.
+    Reads, processes, and analyzes well data.
     """
 
     __slots__ = (
@@ -206,7 +53,7 @@ class WellData:
     @document_kwargs_from_configdict(CONFIG)
     def __init__(
         self,
-        filename: str,
+        data: Union[str, pd.DataFrame],
         column_names: WellDataColumnNames,
         **kwargs,
     ) -> None:
@@ -215,54 +62,52 @@ class WellData:
 
         Parameters
         ----------
-        filename : str
-            Name of the file containing the well data. Currently, only
-            .xlsx, .xls, and .csv formats are supported.
+        data : Union[str, pd.DataFrame]
+            If a string is provided, the argument is interpreted as a file path
+            containing the well data. Currently, only .xlsx, .xls, and .csv
+            formats are supported.
+            If a DataFrame is provided, it is directly utilized
 
         column_names : WellDataColumnNames
             A WellDataColumnNames object containing the names of various columns
         """
         # Import columns whose column names have been provided.
         LOGGER.info("Reading the well data from the input file.")
-        if isinstance(filename, pd.DataFrame):
-            # Allows passing the input data as a DataFrame. This feature would
-            # be useful for creating new objects with existing DataFrame objects.
-            # Otherwise, the data needs to be saved to a file and then read.
-            # Use case: Partition the wells as gas and oil wells and return them as
-            # two new WellData objects
-            self.data = filename
+        if isinstance(data, pd.DataFrame):
+            self.data = data
             # Check if the columns are present in the data
             for col in column_names.values():
                 assert col in self.data.columns
 
-        elif filename.split(".")[-1] in ["xlsx", "xls"]:
-            self.data = pd.read_excel(
-                filename,
-                sheet_name=kwargs.pop("sheet", 0),
-                usecols=column_names.values(),
-                # Store well ids as strings
-                dtype={column_names.well_id: str},
-            )
+        elif isinstance(data, str):
+            extension = pathlib.Path(data).suffix
+            if extension in [".xlsx", ".xls"]:
+                self.data = pd.read_excel(
+                    data,
+                    sheet_name=kwargs.pop("sheet", 0),
+                    usecols=column_names.values(),
+                    # Store well ids as strings
+                    dtype={column_names.well_id: str},
+                )
+            elif extension == ".csv":
+                self.data = pd.read_csv(
+                    data,
+                    usecols=column_names.values(),
+                    # Store well ids as strings
+                    dtype={column_names.well_id: str},
+                )
 
-            # Updating the `index` to keep it consistent with the row numbers in file
-            self.data.index += 2
-
-        elif filename.split(".")[-1] == "csv":
-            self.data = pd.read_csv(
-                filename,
-                usecols=column_names.values(),
-                # Store well ids as strings
-                dtype={column_names.well_id: str},
-            )
-
-            # Updating the `index` to keep it consistent with the row numbers in file
+            else:
+                raise_exception(
+                    "Unsupported input file format. Only .xlsx, .xls, and .csv are supported.",
+                    TypeError,
+                )
+            # Updating the `index` to keep it consistent with
+            # the row numbers in file
             self.data.index += 2
 
         else:
-            raise_exception(
-                "Unsupported input file format. Only .xlsx, .xls, and .csv are supported.",
-                TypeError,
-            )
+            raise_exception("Unknown variable type for input data", TypeError)
 
         # Read input options
         self.config = CONFIG(kwargs)
@@ -296,13 +141,28 @@ class WellData:
         if num_wells_processed < num_wells_input:
             LOGGER.warning(msg)
 
-    def __contains__(self, val):
+    def __contains__(self, val: str):
         """Checks if a column is available in the well data"""
         return val in self.data.columns
+
+    def __getitem__(self, col_name: str):
+        """Returns the col_name column in the DataFrame"""
+        return self.data[col_name]
 
     def __iter__(self):
         """Iterate over all rows of the well data"""
         return iter(self.data.index)
+
+    def __len__(self):
+        """Returns number of wells in the dataset"""
+        return len(self.data)
+
+    @property
+    def col_names(self) -> WellDataColumnNames:
+        """
+        Returns the WellDataColumnNames object associated with the current object
+        """
+        return self._col_names
 
     @property
     def get_removed_wells(self):
@@ -311,9 +171,7 @@ class WellData:
         for val in self._removed_rows.values():
             row_list += val
 
-        row_list.sort()
-
-        return row_list
+        return sorted(row_list)
 
     @property
     def get_removed_wells_with_reason(self):
@@ -442,8 +300,6 @@ class WellData:
         -------
         None
         """
-        # NOTE: Can avoid reassignment by passing the argument inplace=True.
-        # But this is not recommended.
         new_well_data = self.data.dropna(subset=col_name)
 
         if new_well_data.shape[0] == self.data.shape[0]:
@@ -451,7 +307,7 @@ class WellData:
             return
 
         LOGGER.warning(
-            f"Removed a few wells because {col_name} information is not available for them."
+            f"Removed wells because {col_name} information is not available for them."
         )
         removed_rows = [i for i in self.data.index if i not in new_well_data.index]
         if dict_key in self._removed_rows:
@@ -466,7 +322,7 @@ class WellData:
         self,
         col_name: str,
         value: Union[float, int, str],
-        flag_col_name: Union[None, str] = None,
+        flag_col_name: Optional[str] = None,
     ):
         """
         Fill empty cells in a column with a constant value
@@ -484,7 +340,7 @@ class WellData:
             and flags those wells with empty cells in column `col_name`.
         """
 
-        # This loop adds a flag if an empty cell if filled with a default value
+        # This loop adds a flag if an empty cell is filled with a default value
         if flag_col_name is not None:
             flag, empty_cells = self.has_incomplete_data(col_name)
             self.flag_wells(rows=empty_cells, col_name=flag_col_name)
@@ -621,8 +477,7 @@ class WellData:
             return
 
         self.data[col_name] = 0
-        for row in rows:
-            self.data.loc[row, col_name] = 1
+        self.data.loc[rows, col_name] = 1
 
     def add_new_columns(self):
         """
@@ -655,7 +510,7 @@ class WellData:
         flag_col_name = column + "_flag"
 
         # Uncomment this when estimation is supported.
-        # estimiation_function = {
+        # estimation_function = {
         #     "age": None,  # Replace None with function name later
         #     "depth": None,  # Replace None with function name later
         # }
@@ -669,7 +524,7 @@ class WellData:
         elif missing_method == "estimate":
             LOGGER.warning(f"Estimating the {column} of a well if it is missing.")
             # Uncomment the line below when it is supported
-            # estimiation_function[column](self)
+            # estimation_function[column](self)
             # NOTE: Make sure to flag wells for which info is estimated
             raise_exception(
                 f"{column} estimation feature is not supported currently.",
@@ -884,7 +739,7 @@ class WellData:
         column_names = copy.deepcopy(self._col_names)
 
         return WellData(
-            filename=self.data.loc[row_list],
+            data=self.data.loc[row_list],
             column_names=column_names,
             **config_options,
         )
@@ -1050,7 +905,7 @@ class WellData:
             if metric.is_binary_type:
                 self.convert_data_to_binary(metric.data_col_name)
 
-            # Step 4: Ensure that the column in numeric
+            # Step 4: Ensure that the column is numeric
             flag, non_numeric_rows = self.is_data_numeric(col_name=metric.data_col_name)
             if not flag:
                 msg = (
@@ -1104,15 +959,15 @@ class WellData:
         filename: str
             Name of the file
         """
-        if filename.split(".")[-1] in ["xlsx", "xls"]:
+        extension = pathlib.Path(filename).suffix
+        if extension in [".xlsx", ".xls"]:
             self.data.to_excel(filename)
 
-        elif filename.split(".")[-1] == "csv":
+        elif extension == ".csv":
             self.data.to_csv(filename)
 
         else:
-            file_format = "." + filename.split(".")[-1]
             raise_exception(
-                f"Format {file_format} is not supported.",
+                f"Format {extension} is not supported.",
                 ValueError,
             )

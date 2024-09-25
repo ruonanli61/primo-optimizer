@@ -20,7 +20,7 @@ import pytest
 from nbconvert.preprocessors import ExecutePreprocessor
 
 
-@pytest.mark.demo
+@pytest.mark.scip
 def test_example():
     notebook_path = os.path.join("primo", "demo", "PRIMO - Example_1.ipynb")
     with open(notebook_path) as notebook_file:

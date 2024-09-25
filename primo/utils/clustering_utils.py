@@ -10,104 +10,138 @@
 # reproduce, distribute copies to the public, prepare derivative works, and
 # perform publicly and display publicly, and to permit others to do so.
 #################################################################################
-# Standard lib
+
+# Standard libs
+import logging
 
 # Installed libs
 import numpy as np
-import pandas as pd
 from haversine import Unit, haversine_vector
+from sklearn.cluster import AgglomerativeClustering
 
 # User-defined libs
+from primo.data_parser import WellData
 from primo.utils.raise_exception import raise_exception
 
+LOGGER = logging.getLogger(__name__)
 
-def distance_matrix(candidates: pd.DataFrame, weights: dict) -> np.ndarray:
+
+def distance_matrix(wd: WellData, weights: dict) -> np.ndarray:
     """
-    Generate a distance matrix based on the given features and associated weights for each
-    pair of the given well candidates.
+    Generate a distance matrix based on the given features and
+    associated weights for each pair of the given well candidates.
 
     Parameters
     ----------
-    candidates : pd.DataFrame
-        Input DataFrame with "Latitude," "Longitude," "Age [Years],"
-        and "Depth [ft]" columns of the well candidates.
+    wd : WellData
+        WellData object
 
     weights : dict
-        Weights assigned to the features---distance, age, and depth when performing the clustering.
+        Weights assigned to the features---distance, age, and
+        depth when performing the clustering.
 
     Returns
     -------
     np.ndarray
-        Distance matrix to be used for the agglomerative clustering method
+        Distance matrix to be used for the agglomerative
+        clustering method
 
     Raises
     ------
     ValueError
-        1. If the latitude, longitude, age, or depth is missing in the input DataFrame;
-        2. if the sum of feature weights does not equal 1;
-        3. if the weight of any feature---distance, age, or depth---is not provided;
-        4. if a spurious feature's weight is included apart from the distance, age, and depth.
+        1. if a spurious feature's weight is included apart from
+            distance, age, and depth.
+        2. if the sum of feature weights does not equal 1.
     """
 
-    weights_sum = sum(weights.values())
+    # If a feature is not provided, then set its weight to zero
+    wt_dist = weights.pop("distance", 0)
+    wt_age = weights.pop("age", 0)
+    wt_depth = weights.pop("depth", 0)
 
-    if np.isclose(weights_sum, 1):
-        pass
-    else:
-        raise_exception("Feature weights do not add up to 1", ValueError)
-
-    df_name = list(candidates.columns)
-    weights_key = weights.keys()
-    if "Latitude" not in df_name or "Longitude" not in df_name:
-        raise_exception(
-            "The latitude or longitude information of well is not provided", ValueError
+    if len(weights) > 0:
+        msg = (
+            f"Received feature(s) {[*weights.keys()]} that are not "
+            f"supported in the clustering step."
         )
-    elif "Age [Years]" not in df_name:
-        raise_exception(
-            "The age information of well is not provided or the corresponding "
-            "column name is not Age [Years]",
-            ValueError,
-        )
-    elif "Depth [ft]" not in df_name:
-        raise_exception(
-            "The depth information of well is not provided or the corresponding "
-            "column name is not Depth [ft]",
-            ValueError,
-        )
+        raise_exception(msg, ValueError)
 
-    criterion = {"distance", "age", "depth"}
+    if not np.isclose(wt_dist + wt_depth + wt_age, 1, rtol=0.001):
+        raise_exception("Feature weights do not add up to 1.", ValueError)
 
-    for key in weights_key:
-        if key not in criterion:
-            raise_exception(
-                f"Currently, the feature {key} is not supported in the clustering step",
-                ValueError,
-            )
-
-    for key in criterion:
-        if key not in weights_key:
-            raise_exception(f"The weight for feature {key} is not provided", ValueError)
-
-    candidates["coor"] = list(zip(candidates.Latitude, candidates.Longitude))
-    distance_matrix_distance = haversine_vector(
-        candidates["coor"].to_list(),
-        candidates["coor"].to_list(),
-        unit=Unit.MILES,
-        comb=True,
+    # Construct the matrices only if the weights are non-zero
+    cn = wd.col_names  # Column names
+    coordinates = list(zip(wd[cn.latitude], wd[cn.longitude]))
+    dist_matrix = (
+        haversine_vector(coordinates, coordinates, unit=Unit.MILES, comb=True)
+        if wt_dist > 0
+        else 0
     )
-    distance_matrix_age = np.abs(
-        np.subtract.outer(
-            (candidates["Age [Years]"]).to_numpy(),
-            (candidates["Age [Years]"]).to_numpy(),
-        )
+
+    age_range_matrix = (
+        np.abs(np.subtract.outer(wd[cn.age].to_numpy(), wd[cn.age].to_numpy()))
+        if wt_age > 0
+        else 0
     )
-    distance_matrix_depth = np.abs(
-        np.subtract.outer(
-            (candidates["Depth [ft]"]).to_numpy(), (candidates["Depth [ft]"]).to_numpy()
-        )
+
+    depth_range_matrix = (
+        np.abs(np.subtract.outer(wd[cn.depth].to_numpy(), wd[cn.depth].to_numpy()))
+        if wt_depth > 0
+        else 0
     )
+
     return (
-        distance_matrix_distance * weights["distance"]
-        + weights["age"] * distance_matrix_age
-        + weights["depth"] * distance_matrix_depth
+        wt_dist * dist_matrix
+        + wt_age * age_range_matrix
+        + wt_depth * depth_range_matrix
     )
+
+
+def perform_clustering(wd: WellData, distance_threshold: float = 10.0):
+    """
+    Partitions the data into smaller clusters.
+
+    Parameters
+    ----------
+    distance_threshold : float, default = 10.0
+        Threshold distance for breaking clusters
+
+    Returns
+    -------
+    n_clusters : int
+        Returns number of clusters
+    """
+    if hasattr(wd.col_names, "cluster"):
+        # Clustering has already been performed, so return.
+        # Return number of cluster.
+        LOGGER.warning(
+            "Found cluster attribute in the WellDataColumnNames object."
+            "Assuming that the data is already clustered. If the corresponding "
+            "column does not correspond to clustering information, please use a "
+            "different name for the attribute cluster while instantiating the "
+            "WellDataColumnNames object."
+        )
+        return len(set(wd[wd.col_names.cluster]))
+
+    # Hard-coding the weights data since this should not be a tunable parameter
+    # for users. Move to arguments if it is desired to make it tunable.
+    # TODO: Need to scale each metric appropriately. Since good scaling
+    # factors are not available right now, setting the weights of age and depth
+    # as zero.
+    weights = {"distance": 1, "age": 0, "depth": 0}
+
+    distance_metric = distance_matrix(wd, weights)
+    clustered_data = AgglomerativeClustering(
+        n_clusters=None,
+        metric="precomputed",
+        linkage="complete",
+        distance_threshold=distance_threshold,
+    ).fit(distance_metric)
+
+    wd.data["Clusters"] = clustered_data.labels_
+    # Uncomment the line below to convert labels to strings. Keeping them as
+    # integers for convenience.
+    # wd.data["Clusters"] = "Cluster " + wd.data["Clusters"].astype(str)
+    wd.col_names.register_new_columns({"cluster": "Clusters"})
+
+    return clustered_data.n_clusters_

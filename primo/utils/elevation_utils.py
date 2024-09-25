@@ -13,7 +13,6 @@
 
 # Standard libs
 import os
-from math import atan2, cos, radians, sin, sqrt
 from typing import Tuple
 
 # Installed libs
@@ -26,6 +25,7 @@ from pyproj import Proj, transform
 
 # User-defined libs
 from primo.utils import Start_coordinates
+from primo.utils.geo_utils import get_distance
 
 
 def get_bing_maps_api_key() -> str:
@@ -43,39 +43,6 @@ def get_bing_maps_api_key() -> str:
     """
     load_dotenv()
     return os.environ["BING_API_KEY"]
-
-
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calculate the Haversine distance between two sets of latitude and longitude coordinates.
-
-    Parameters
-    ----------
-    lat1 : float
-        Latitude of the first point in degrees
-    lon1 : float
-        Longitude of the first point in degrees
-    lat2 : float
-        Latitude of the second point in degrees
-    lon2 : float
-        Longitude of the second point in degrees
-
-    Returns
-    -------
-    float
-        The Haversine distance between the two points in miles
-    """
-    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
-
-    diff_lat = lat2 - lat1
-    diff_lon = lon2 - lon1
-
-    a = sin(diff_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(diff_lon / 2) ** 2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-    distance = 3959.0 * c
-
-    return distance
 
 
 def get_route(
@@ -113,9 +80,8 @@ def get_route(
     if response.status_code == 200 and data.get("resourceSets"):
         route = data["resourceSets"][0]["resources"][0]
         return route
-    else:
-        print(f"Error: {response.status_code}, {data.get('errorDetails')}")
-        return None
+
+    print(f"Error: {response.status_code}, {data.get('errorDetails')}")
 
 
 def get_nearest_road_point(lat: float, long: float) -> Tuple[float, float]:
@@ -147,7 +113,8 @@ def get_nearest_road_point(lat: float, long: float) -> Tuple[float, float]:
 
     if route is None:
         raise ValueError(
-            "Route information is not available for all given input. Please see error message above for the specific point with issue."
+            "Route information is not available for all given input. "
+            "Please see error message above for the specific point with issue."
         )
 
     # Extract route details
@@ -177,8 +144,11 @@ def accessibility(lat: float, long: float) -> float:
     """
 
     closest_road_point = get_nearest_road_point(lat, long)
-    accessibility_quotient = haversine_distance(
-        closest_road_point[0], closest_road_point[1], lat, long
+    accessibility_quotient = get_distance(
+        (closest_road_point[0], closest_road_point[1]),
+        (lat, long),
+        "haversine",
+        "MILES",
     )
 
     return accessibility_quotient
@@ -218,9 +188,9 @@ def get_elevation(lat: float, long: float, tif_file_path: str) -> float:
             elevation = src.read(1, window=((row, row + 1), (col, col + 1)))
             # Check if the value is NoData
             if elevation[0][0] == src.nodatavals[0]:
-                return None  # NoData value, elevation not available
-            else:
-                return elevation[0][0]  # Return the elevation value
+                return  # NoData value, elevation not available
+
+            return elevation[0][0]  # Return the elevation value
 
     except IndexError:
         msg = (
@@ -232,7 +202,7 @@ def get_elevation(lat: float, long: float, tif_file_path: str) -> float:
         print(
             f"Returning None for these coordinates - Latitude:{lat}, Longitude:{long}"
         )
-        return None
+        return
 
 
 def get_elevation_delta(df: pd.DataFrame, tif_file_path: str) -> pd.DataFrame:

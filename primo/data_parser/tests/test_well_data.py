@@ -87,7 +87,7 @@ def test_well_data(caplog, get_column_names):
 
     filename, col_names = get_column_names
     wd = WellData(
-        filename=filename,
+        data=filename,
         column_names=col_names,
         fill_age=99,
         fill_depth=999,
@@ -100,28 +100,28 @@ def test_well_data(caplog, get_column_names):
 
     # Well ID checks
     assert (
-        f"Removed a few wells because {col_names.well_id} "
+        f"Removed wells because {col_names.well_id} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["well_id"] == INCOMPLETE_ROWS["API Well Number"]
 
-    # Latitue checks
+    # Latitude checks
     assert (
-        f"Removed a few wells because {col_names.latitude} "
+        f"Removed wells because {col_names.latitude} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["latitude"] == INCOMPLETE_ROWS["x"]
 
     # Longitude checks
     assert (
-        f"Removed a few wells because {col_names.longitude} "
+        f"Removed wells because {col_names.longitude} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["longitude"] == INCOMPLETE_ROWS["y"]
 
     # Operator name checks
     assert (
-        f"Removed a few wells because {col_names.operator_name} "
+        f"Removed wells because {col_names.operator_name} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["operator_name"] == INCOMPLETE_ROWS["Operator"]
@@ -203,7 +203,7 @@ def test_no_warnings(caplog, get_column_names):
     This function:
     1. Checks if no warnings are thrown if there are no issues with data.
     2. Passing the data as DataFrame instead of a file.
-    3. No categorization is performed if the requied data is not
+    3. No categorization is performed if the required data is not
         available.
     4. A warning is printed if the required input for filter production
         volume function is not available
@@ -223,7 +223,7 @@ def test_no_warnings(caplog, get_column_names):
     assert wd_df.shape[0] == 200
 
     wd = WellData(
-        filename=wd_df,
+        data=wd_df,
         column_names=col_names,
         fill_age=99,
         fill_depth=999,
@@ -279,7 +279,7 @@ def test_no_warnings(caplog, get_column_names):
         ValueError,
         match="Well ID must be unique. Found multiple wells with the same Well ID.",
     ):
-        wd = WellData(filename=wd_df, column_names=col_names)
+        wd = WellData(data=wd_df, column_names=col_names)
 
 
 def test_age_depth_remove(caplog, get_column_names):
@@ -287,20 +287,20 @@ def test_age_depth_remove(caplog, get_column_names):
     filename, col_names = get_column_names
 
     wd = WellData(
-        filename=filename,
+        data=filename,
         column_names=col_names,
         missing_age="remove",
         missing_depth="remove",
     )
 
     assert (
-        f"Removed a few wells because {col_names.age} "
+        f"Removed wells because {col_names.age} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["age"] == INCOMPLETE_ROWS["Age"]
 
     assert (
-        f"Removed a few wells because {col_names.depth} "
+        f"Removed wells because {col_names.depth} "
         f"information is not available for them."
     ) in caplog.text
     assert wd._removed_rows["depth"] == INCOMPLETE_ROWS["Depth"]
@@ -315,7 +315,7 @@ def test_age_depth_estimation(caplog, get_column_names):
         match="age estimation feature is not supported currently.",
     ):
         wd = WellData(
-            filename=filename,
+            data=filename,
             column_names=col_names,
             missing_age="estimate",
         )
@@ -327,7 +327,7 @@ def test_age_depth_estimation(caplog, get_column_names):
         match="depth estimation feature is not supported currently.",
     ):
         wd = WellData(
-            filename=filename,
+            data=filename,
             column_names=col_names,
             missing_depth="estimate",
         )
@@ -335,7 +335,9 @@ def test_age_depth_estimation(caplog, get_column_names):
     assert "Estimating the depth of a well if it is missing." in caplog.text
 
 
-def test_well_partitioning(tmp_path, get_column_names):
+def test_well_partitioning(
+    tmp_path, get_column_names
+):  # pylint: disable=too-many-statements
     filename, col_names = get_column_names
     # Doing this to avoid oil-gas classification
     col_names.ann_gas_production = None
@@ -365,7 +367,7 @@ def test_well_partitioning(tmp_path, get_column_names):
         wd_df.loc[i, col_names.well_type_by_depth] = "Shallow"
 
     # Construct the WellData object
-    wd = WellData(filename=wd_df, column_names=col_names)
+    wd = WellData(data=wd_df, column_names=col_names)
 
     assert wd._well_types["oil"] == set(range(100, 200))
     assert wd._well_types["gas"] == set(range(100))
@@ -417,13 +419,13 @@ def test_well_partitioning(tmp_path, get_column_names):
     with pytest.raises(ValueError, match="Format .foo is not supported."):
         full_partition_wells["deep_gas"].save_to_file(deep_gas_file)
 
-    # Check unrecognized well-type erros
+    # Check unrecognized well-type errors
     wd_df.loc[0, col_names.well_type] = "Foo"
     with pytest.raises(
         ValueError,
         match=("Well-type must be either oil or gas. Received " "Foo in row 0."),
     ):
-        wd = WellData(filename=wd_df, column_names=col_names)
+        wd = WellData(data=wd_df, column_names=col_names)
 
     wd_df.loc[0, col_names.well_type] = "gas"
     wd_df.loc[0, col_names.well_type_by_depth] = "Foo"
@@ -434,14 +436,16 @@ def test_well_partitioning(tmp_path, get_column_names):
             "Foo in row 0."
         ),
     ):
-        wd = WellData(filename=wd_df, column_names=col_names)
+        wd = WellData(data=wd_df, column_names=col_names)
 
 
-def test_compute_priority_scores(caplog, get_column_names):
+def test_compute_priority_scores(
+    caplog, get_column_names
+):  # pylint: disable=too-many-statements
     filename, col_names = get_column_names
 
     wd = WellData(
-        filename=filename,
+        data=filename,
         column_names=col_names,
         fill_age=99,
         fill_depth=999,
@@ -593,7 +597,7 @@ def test_compute_priority_scores(caplog, get_column_names):
     # Set a non-numeric value
     wd_df[col_names.hospitals] = wd_df[col_names.hospitals].astype("object")
     wd_df.loc[250, col_names.hospitals] = "NULL"
-    wd = WellData(filename=wd_df, column_names=col_names)
+    wd = WellData(data=wd_df, column_names=col_names)
     with pytest.raises(
         ValueError,
         match=(
@@ -611,7 +615,7 @@ def test_compute_priority_scores(caplog, get_column_names):
     im_metrics.fed_dac.weight = 0
 
     wd_df = pd.read_csv(filename, usecols=col_names.values())
-    wd = WellData(filename=wd_df, column_names=col_names)
+    wd = WellData(data=wd_df, column_names=col_names)
     with pytest.raises(
         ValueError,
         match=(

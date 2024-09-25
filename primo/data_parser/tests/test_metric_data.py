@@ -16,7 +16,7 @@ import logging
 
 # Installed libs
 import pytest
-from pyomo.common.config import Bool, ConfigValue, NonNegativeFloat
+from pyomo.common.config import Bool, NonNegativeFloat
 
 # User-defined libs
 from primo.data_parser.metric_data import (
@@ -68,7 +68,7 @@ def test_metric_class(caplog):
     ):
         z.name = "modified_met_1"
 
-    # Add a test to catch non isidentifier metric
+    # Add a test to catch a metric name that is not a valid Python variable name
     with pytest.raises(
         ValueError,
         match=(
@@ -230,7 +230,7 @@ def test_set_of_metrics_class():
         "Sub Metric Three-Two": z.sub_met_3_2,
     }
 
-    # Test iter method and contains method
+    # Test iterator method and contains method
     for obj in z:
         assert obj in _all_metrics.values()
         assert obj.name in z

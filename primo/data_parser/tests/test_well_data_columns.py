@@ -67,7 +67,7 @@ def test_well_data_column_names():
         assert key in cols
         assert val is not None
 
-    # Testing iter method
+    # Testing iterator method
     for key in wcn:
         if key not in cols:
             assert getattr(wcn, key) is None
@@ -170,7 +170,6 @@ def test_unsupported_metric_warn(caplog, get_well_data_cols):
     im_mt.register_new_metric(name="metric_1", full_name="Metric One")
     wcn.check_columns_available(im_mt)
 
-    # assert len(record) == 1
     assert (
         "Metric/submetric metric_1/Metric One is not supported. "
         "Users are required to process the data for this metric, and "
