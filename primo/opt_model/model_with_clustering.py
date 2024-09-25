@@ -388,6 +388,18 @@ class PluggingCampaignModel(ConcreteModel):
                 <= max_owc
             )
 
+    def optimize_fix(self):
+        """
+        Fixes the binary variables associated with the cluster
+        and/or the wells with in the cluster based on the user selection
+        """
+
+        cluster_fix_dict = self.model_inputs.config.well_fix
+
+        for c in self.set_clusters:
+            cluster, wells = cluster_fix_dict.get(c)
+            self.cluster[c].fix(cluster, wells)
+
     def append_objective(self):
         """ "
         Appends objective function to the model

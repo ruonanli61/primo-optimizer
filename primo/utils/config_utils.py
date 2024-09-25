@@ -546,11 +546,11 @@ class UserPriorities:
         return self.priorities_, self.sub_priorities_
 
 
-class SelectWidget:
+class BaseSelectWidget:
     """
     Class for displaying an autofill widget in Jupyter Notebook to select multiple choices from a
-    list of choices provided. The widget comes configured with an "Undo" button that clears all
-    selections
+    list of choices provided. The widget comes configured with an "Undo" button that exclude the
+    designated well from the selections
 
     Parameters
     ----------
@@ -582,10 +582,8 @@ class SelectWidget:
         button_description: str,
         type_description: str,
     ):
-        # AutoComplete box requires a dictionary
-        words_dict = {word: {} for word in choices}
+        self.choices = choices
 
-        self._autocomplete = AutoComplete(words=words_dict)
         # Initialize text
         self._text = ""
         self.widget = widgets.Combobox(
@@ -606,13 +604,23 @@ class SelectWidget:
         # Remove button
         self.button_remove = widgets.Button(description="Undo", layout=layout)
         self.button_remove.on_click(self._remove)
+
         self.selected_list = []
+
+        # Cluster Button
+        # self.button_cluster = widgets.Button(description="Cluster", layout=layout)
+        # self.button_cluster.on_click(self._pass_current_selection)
 
     def _on_change(self, data) -> None:
         """
         Dynamically update the list of choices available in the drop down widget
         based on what is already selected
         """
+        # AutoComplete box requires a dictionary
+
+        words_dict = {word: {} for word in self.choices}
+
+        self._autocomplete = AutoComplete(words=words_dict)
 
         self._text = data["new"]
 
@@ -663,10 +671,184 @@ class SelectWidget:
         Display the widget and button in the Jupyter Notebook
         """
         buttons = widgets.HBox([self.button_add, self.button_remove])
-        display(self.widget, buttons)
+        return widgets.VBox([self.widget, buttons])
 
     def return_selections(self) -> List[str]:
         """
         Return the list of selections made by a user
         """
         return self.selected_list
+
+    def _pass_current_selection(self):
+        return self._text
+
+
+class SelectWidget(BaseSelectWidget):
+    """SelectWidget for direct selection of choices."""
+
+
+class SubSelectWidget(BaseSelectWidget):
+    """
+    SubSelectWidget for displaying an autofill widget that depends on selections from another widget.
+
+    Parameters
+    ----------
+    choices: typing.Iterable[str]
+        Full collection of choices
+
+    button_description: str
+        Description displayed on the widget
+
+    type_description: str
+        Type of object to be selected, displayed on the widget
+
+    well_data: DataFrame
+        Data containing well information
+    """
+
+    def __init__(
+        self,
+        cluster_choices: typing.Iterable[str],
+        button_description_cluster: str,
+        button_description_well: str,
+        well_data,
+    ):
+        super().__init__(cluster_choices, button_description_well, "Well")
+        self.cluster_widget = SelectWidget(
+            cluster_choices, button_description_cluster, "Cluster"
+        )
+        # self.cluster_widget.display()
+        self.well_data = well_data
+
+    def _on_change(self, data) -> None:
+        """
+        Dynamically update the list of choices available in the drop down widget
+        based on what is already selected
+        """
+
+        cluster = self.cluster_widget._pass_current_selection()
+        well_candidate = self.well_data[self.well_data["Clusters"] == int(cluster)][
+            "API Well Number"
+        ]
+
+        words_dict = {word: {} for word in well_candidate}
+
+        self._autocomplete = AutoComplete(words=words_dict)
+
+        self._text = data["new"]
+
+        values = self._autocomplete.search(self._text, max_cost=3, size=3)
+
+        # convert nested list to flat list
+        values = list(sorted(set(str(item) for sublist in values for item in sublist)))
+
+        self.widget.options = values
+
+
+class SubSelectWidgetAdd(SubSelectWidget):
+    def __init__(
+        self,
+        cluster_choices: typing.Iterable[str],
+        button_description_cluster: str,
+        button_description_well: str,
+        well_data,
+    ):
+        super().__init__(
+            cluster_choices,
+            button_description_cluster,
+            button_description_well,
+            well_data,
+        )
+
+        self.re_cluster = widgets.BoundedIntText(
+            # value=self.current_cluster,
+            min=min(well_data["Clusters"]),
+            max=max(well_data["Clusters"]),
+            step=1,
+            description="To Cluster:",
+            disabled=False,
+        )
+
+        self.re_cluster_dict = {}
+
+    # def _on_change(self, _) -> None:
+    #     super()._on_change(_)
+    #     self.current_cluster = self.cluster_widget._pass_current_selection()
+
+    def _add(self, _) -> None:
+        super()._add(_)
+        self.re_cluster_dict[self._text] = self.re_cluster.value
+
+    def _remove(self, _) -> None:
+        super()._remove(_)
+        del self.re_cluster_dict[self._text]
+
+    def display(self):
+        """
+        Display the widget and button in the Jupyter Notebook
+        """
+        widget_box = widgets.HBox([self.widget, self.re_cluster])
+        buttons = widgets.HBox([self.button_add, self.button_remove])
+        return widgets.VBox([widget_box, buttons])
+
+    def return_selections(self) -> List[str]:
+        """
+        Return the list of selections made by a user
+        """
+        return self.selected_list, self.re_cluster_dict
+
+
+class UserSelection:
+    def __init__(
+        self,
+        well_selected: tuple,
+        well_data,
+    ):
+
+        cluster_selected = []
+        for key, value in well_selected.items():
+            cluster_selected.append(str(key))
+        cluster_selected = cluster_selected
+
+        # col_names = well_data.col_names
+        all_cluster = well_data["Clusters"].astype(str)
+
+        self.add_widget = SubSelectWidgetAdd(
+            all_cluster,
+            "Select clusters to manually add",
+            "Select wells to manually add",
+            well_data,
+        )
+
+        self.remove_widget = SubSelectWidget(
+            cluster_selected,
+            "Select clusters to manually remove",
+            "Select wells to manually remove",
+            well_data,
+        )
+
+        self.unlock_widget = SubSelectWidget(
+            cluster_selected,
+            "Select clusters to manually unlock",
+            "Select wells to manually unlock",
+            well_data,
+        )
+
+        self.widgets_dict = {
+            "Add": self.add_widget,
+            "Remove": self.remove_widget,
+            "Unlock": self.unlock_widget,
+        }
+
+    def display(self) -> None:
+        for action, widget in self.widgets_dict.items():
+            cluster_vbox = widget.cluster_widget.display()
+            well_vbox = widget.display()
+            widget = widgets.HBox([cluster_vbox, well_vbox])
+            display(f"{action} clusters/wells", widget)
+
+    def return_value(self):
+        return [
+            (widget.cluster_widget.return_selections(), widget.return_selections())
+            for _, widget in self.widgets_dict.items()
+        ]
