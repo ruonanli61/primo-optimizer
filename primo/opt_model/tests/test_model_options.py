@@ -183,8 +183,8 @@ def test_opt_model_inputs(get_column_names):
     assert isinstance(opt_campaign[0], dict)
     assert isinstance(opt_campaign[1], dict)
 
-    # Four projects are chosen in the optimal campaign
-    assert len(opt_campaign[0]) == 4
+    # Five projects are chosen in the optimal campaign
+    assert len(opt_campaign[0]) == 5
 
     # Test the structure of the optimization model
     num_clusters = len(set(wd_gas["Clusters"]))

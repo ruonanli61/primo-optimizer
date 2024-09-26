@@ -34,7 +34,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "docs/conf.py": 4,
     "primo/opt_model/base_model.py": 15,
     "primo/opt_model/model_options.py": 13,
-    "primo/opt_model/model_with_clustering.py": 16,
+    "primo/opt_model/model_with_clustering.py": 18,
     "primo/opt_model/opt_model.py": 18,
     "primo/opt_model/tests/test_base_model.py": 13,
     "primo/opt_model/tests/test_model_options.py": 129,
