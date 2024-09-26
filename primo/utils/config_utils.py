@@ -812,26 +812,27 @@ class UserSelection:
 
         # col_names = well_data.col_names
         all_cluster = well_data["Clusters"].astype(str)
+        # well_add_candidate =
 
         self.add_widget = SubSelectWidgetAdd(
             all_cluster,
             "Select clusters to manually add",
             "Select wells to manually add",
-            well_data,
+            well_add_candidate,
         )
 
         self.remove_widget = SubSelectWidget(
             cluster_selected,
             "Select clusters to manually remove",
             "Select wells to manually remove",
-            well_data,
+            well_selected,
         )
 
         self.unlock_widget = SubSelectWidget(
             cluster_selected,
             "Select clusters to manually unlock",
             "Select wells to manually unlock",
-            well_data,
+            well_selected,
         )
 
         self.widgets_dict = {

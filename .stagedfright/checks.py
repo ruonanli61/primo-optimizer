@@ -43,7 +43,7 @@ MAP_PATH_EXPECTED_HARDCODED_DATA_COUNT = {
     "primo/utils/age_depth_estimation.py": 18,
     "primo/utils/census_utils.py": 12,
     "primo/utils/clustering_utils.py": 13,
-    "primo/utils/config_utils.py": 30,
+    "primo/utils/config_utils.py": 31,
     "primo/utils/demo_utils.py": 30,
     "primo/utils/elevation_utils.py": 14,
     "primo/utils/estimation_utils.py": 14,
