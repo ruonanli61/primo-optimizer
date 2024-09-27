@@ -337,6 +337,8 @@ class PluggingCampaignModel(ConcreteModel):
 
         # Define essential variables and constraints for each cluster
         self.cluster = ClusterBlock(self.set_clusters, rule=build_cluster_model)
+
+        # Define slack variable for unutilized budget
         self.budget_slack_var = Var(
             within=NonNegativeReals,
             doc="Slack variable for the unutilized amount of total budget",
@@ -428,7 +430,7 @@ class PluggingCampaignModel(ConcreteModel):
         )
 
     def append_objective(self):
-        """ "
+        """
         Appends objective function to the model
         """
         self.total_priority_score = Objective(
