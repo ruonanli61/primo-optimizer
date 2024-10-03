@@ -607,10 +607,6 @@ class BaseSelectWidget:
 
         self.selected_list = []
 
-        # Cluster Button
-        # self.button_cluster = widgets.Button(description="Cluster", layout=layout)
-        # self.button_cluster.on_click(self._pass_current_selection)
-
     def _on_change(self, data) -> None:
         """
         Dynamically update the list of choices available in the drop down widget
@@ -671,13 +667,15 @@ class BaseSelectWidget:
         Display the widget and button in the Jupyter Notebook
         """
         buttons = widgets.HBox([self.button_add, self.button_remove])
-        return widgets.VBox([self.widget, buttons])
+        vbox = widgets.VBox([self.widget, buttons])
+        vbox.layout.align_items = "flex-end"
+        return vbox
 
-    def return_selections(self) -> List[str]:
+    def return_selections(self) -> List[int]:
         """
         Return the list of selections made by a user
         """
-        return self.selected_list
+        return [int(item) for item in self.selected_list]
 
     def _pass_current_selection(self):
         return self._text
@@ -718,7 +716,7 @@ class SubSelectWidget(BaseSelectWidget):
             cluster_choices, button_description_cluster, "Cluster"
         )
         # self.cluster_widget.display()
-        self.well_data = well_data
+        self.wd = well_data
 
     def _on_change(self, data) -> None:
         """
@@ -727,9 +725,9 @@ class SubSelectWidget(BaseSelectWidget):
         """
 
         cluster = self.cluster_widget._pass_current_selection()
-        well_candidate = self.well_data[self.well_data["Clusters"] == int(cluster)][
-            "API Well Number"
-        ]
+        well_candidate = self.wd.data[
+            self.wd.data[self.wd._col_names.cluster] == int(cluster)
+        ][self.wd._col_names.well_id]
 
         words_dict = {word: {} for word in well_candidate}
 
@@ -745,25 +743,24 @@ class SubSelectWidget(BaseSelectWidget):
         self.widget.options = values
 
 
-class SubSelectWidgetAdd(SubSelectWidget):
+class SelectWidgetAdd(SelectWidget):
     def __init__(
         self,
-        cluster_choices: typing.Iterable[str],
-        button_description_cluster: str,
-        button_description_well: str,
-        well_data,
+        well_choices: typing.Iterable[str],
+        button_description: str,
+        type_description: str,
     ):
+        self.wd = well_choices
         super().__init__(
-            cluster_choices,
-            button_description_cluster,
-            button_description_well,
-            well_data,
+            self.wd.data[self.wd._col_names.well_id],
+            button_description,
+            type_description,
         )
 
         self.re_cluster = widgets.BoundedIntText(
-            # value=self.current_cluster,
-            min=min(well_data["Clusters"]),
-            max=max(well_data["Clusters"]),
+            # value=current_cluster,
+            min=min(self.wd.data[self.wd._col_names.cluster]),
+            max=max(self.wd.data[self.wd._col_names.cluster]),
             step=1,
             description="To Cluster:",
             disabled=False,
@@ -777,11 +774,17 @@ class SubSelectWidgetAdd(SubSelectWidget):
 
     def _add(self, _) -> None:
         super()._add(_)
-        self.re_cluster_dict[self._text] = self.re_cluster.value
+        well_index = self.wd.data[
+            self.wd.data[self.wd._col_names.well_id] == self._text
+        ].index.item()
+        self.re_cluster_dict.setdefault(self.re_cluster.value, []).append(well_index)
 
     def _remove(self, _) -> None:
         super()._remove(_)
-        del self.re_cluster_dict[self._text]
+        well_index = self.well_choices[
+            self.wd.data[self.wd._col_names.well_id] == self._text
+        ].index.item()
+        self.re_cluster_dict[self.re_cluster.value].remove(well_index)
 
     def display(self):
         """
@@ -789,50 +792,54 @@ class SubSelectWidgetAdd(SubSelectWidget):
         """
         widget_box = widgets.HBox([self.widget, self.re_cluster])
         buttons = widgets.HBox([self.button_add, self.button_remove])
-        return widgets.VBox([widget_box, buttons])
+        vbox = widgets.VBox([widget_box, buttons])
+        # vbox.layout.align_items = "flex-end"
+        return vbox
 
-    def return_selections(self) -> List[str]:
+    def return_selections(self) -> List[int]:
         """
         Return the list of selections made by a user
         """
-        return self.selected_list, self.re_cluster_dict
+        return [item for item in self.selected_list], self.re_cluster_dict
 
 
 class UserSelection:
-    def __init__(
-        self,
-        well_selected: tuple,
-        well_data,
-    ):
+    def __init__(self, well_selected: tuple, model_inputs):
 
-        cluster_selected = []
-        for key, value in well_selected.items():
-            cluster_selected.append(str(key))
-        cluster_selected = cluster_selected
+        self.wd = model_inputs.config.well_data
+        self.cluster_selected = list(well_selected.keys())
+        well_selected_list = [
+            well for wells in well_selected.values() for well in wells
+        ]
+        self.well_selected = self.wd._construct_sub_data(well_selected_list)
 
-        # col_names = well_data.col_names
-        all_cluster = well_data["Clusters"].astype(str)
-        # well_add_candidate =
+        all_cluster = self.wd.data[self.wd._col_names.cluster].astype(str)
+        cluster_selected_choice = [str(cluster) for cluster in self.cluster_selected]
 
-        self.add_widget = SubSelectWidgetAdd(
-            all_cluster,
-            "Select clusters to manually add",
-            "Select wells to manually add",
-            well_add_candidate,
+        all_wells = self.wd.data.index
+        well_add_candidate_list = [
+            well for well in all_wells if well not in well_selected_list
+        ]
+        well_add_candidate = self.wd._construct_sub_data(well_add_candidate_list)
+        # well_add_candidate = self.wd.data[~self.wd.data.index.isin(well_selected_list)]
+        # well_add_candidate = self.wd.data[~self.wd.data[self.wd._col_names.well].isin(well_selected_list)]
+
+        self.add_widget = SelectWidgetAdd(
+            well_add_candidate, "Select wells to manually add", "Well"
         )
 
         self.remove_widget = SubSelectWidget(
-            cluster_selected,
+            cluster_selected_choice,
             "Select clusters to manually remove",
             "Select wells to manually remove",
-            well_selected,
+            self.well_selected,
         )
 
         self.unlock_widget = SubSelectWidget(
-            cluster_selected,
+            cluster_selected_choice,
             "Select clusters to manually unlock",
             "Select wells to manually unlock",
-            well_selected,
+            self.well_selected,
         )
 
         self.widgets_dict = {
@@ -843,13 +850,57 @@ class UserSelection:
 
     def display(self) -> None:
         for action, widget in self.widgets_dict.items():
-            cluster_vbox = widget.cluster_widget.display()
-            well_vbox = widget.display()
-            widget = widgets.HBox([cluster_vbox, well_vbox])
-            display(f"{action} clusters/wells", widget)
+            if action == "Add":
+                well_vbox = widget.display()
+                display(f"{action} wells", well_vbox)
+            else:
+                cluster_vbox = widget.cluster_widget.display()
+                well_vbox = widget.display()
+                widget = widgets.HBox([cluster_vbox, well_vbox])
+                display(f"{action} clusters/wells", widget)
 
     def return_value(self):
-        return [
-            (widget.cluster_widget.return_selections(), widget.return_selections())
-            for _, widget in self.widgets_dict.items()
+        # def create_dict(selections, value):
+        #     return {item: value for item in selections}
+
+        def return_well_index_cluster(selections):
+            selections_dict = {}
+            for well in selections:
+                well_index = self.wd.data[
+                    self.wd.data[self.wd._col_names.well_id] == str(well)
+                ].index.item()
+                cluster = self.wd.data[
+                    self.wd.data[self.wd._col_names.well_id] == str(well)
+                ][self.wd._col_names.cluster].item()
+                selections_dict.setdefault(cluster, []).append(well_index)
+            return selections_dict
+
+        add_widget_return = (
+            return_well_index_cluster(self.add_widget.return_selections()[0]),
+            self.add_widget.return_selections()[1],
+        )
+
+        remove_widget_return = (
+            self.remove_widget.cluster_widget.return_selections(),
+            return_well_index_cluster(self.remove_widget.return_selections()),
+        )
+
+        cluster_unlock_list = self.unlock_widget.cluster_widget.return_selections()
+        well_unlock_list = self.unlock_widget.return_selections()
+        cluster_lock_list = [
+            cluster
+            for cluster in self.cluster_selected
+            if cluster not in cluster_unlock_list
         ]
+        well_lock_list = [
+            well
+            for well in self.well_selected[self.wd._col_names.well_id]
+            if well not in well_unlock_list
+        ]
+
+        unlock_widget_return = (
+            cluster_lock_list,
+            return_well_index_cluster(well_lock_list),
+        )
+
+        return [add_widget_return, remove_widget_return, unlock_widget_return]
