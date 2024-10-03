@@ -90,7 +90,6 @@ def get_column_names_fixture():
     current_file = pathlib.Path(__file__).resolve()
     # primo folder is 2 levels up the current folder
     data_file = str(current_file.parents[2].joinpath("demo", "Example_1_data.csv"))
-    # str(current_file.parents[2].joinpath("demo", "Example_1_data.csv"))
     return im_metrics, col_names, data_file
 
 
@@ -327,8 +326,8 @@ def test_incremental_formulation(get_column_names):
     assert not hasattr(opt_mdl, "min_budget_usage_con")
 
     # Check if the scaling factor for budget slack variable is correctly built
-    scaling_factor, budget_sufficient = opt_mdl.budget_slack_variable_scaling()
-    assert np.isclose(opt_mdl.slack_var_scaling(), 0)
+    _, budget_sufficient = opt_mdl.budget_slack_variable_scaling()
+    assert np.isclose(opt_mdl.slack_var_scaling.value, 0)
     assert not budget_sufficient
 
     # Four projects are chosen in the optimal campaign
