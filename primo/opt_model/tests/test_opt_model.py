@@ -37,8 +37,7 @@ def opt_model_inputs(request):
     project_budget = 1000000
 
     # Reading in sample data
-    screening_file = os.path.join("opt_toy_model.csv")
-    # "primo", "opt_model", "tests",
+    screening_file = os.path.join("primo", "opt_model", "tests", "opt_toy_model.csv")
     well_gdf = pd.read_csv(screening_file)
 
     # Introducing sample mobilization cost scheme
