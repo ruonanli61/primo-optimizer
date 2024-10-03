@@ -377,8 +377,11 @@ class PluggingCampaignModel(ConcreteModel):
         if model_inputs.config.max_wells_per_owner is not None:
             self.add_owner_well_count()
 
-        if budget_sufficient is False:
-            self.add_min_budget_usage()
+        if model_inputs.config.min_budget_usage is not None:
+            if budget_sufficient is False:
+                self.add_min_budget_usage()
+        else:
+            self.slack_var_scaling = 0
 
         # Append the objective function
         self.append_objective()
@@ -421,12 +424,13 @@ class PluggingCampaignModel(ConcreteModel):
         budget is used when the budget is sufficient to
         plug all wells.
         """
+        min_percent = self.model_inputs.config.min_budget_usage / 100
         self.min_budget_usage_con = Constraint(
             expr=(
                 sum(self.cluster[c].plugging_cost for c in self.set_clusters)
-                >= 0.5 * self.total_budget
+                >= min_percent * self.total_budget
             ),
-            doc="Enforces a minimum budget usage of 50%",
+            doc="Enforces a minimum budget usage",
         )
 
     def append_objective(self):

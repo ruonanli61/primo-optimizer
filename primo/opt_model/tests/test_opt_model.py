@@ -37,7 +37,8 @@ def opt_model_inputs(request):
     project_budget = 1000000
 
     # Reading in sample data
-    screening_file = os.path.join("primo", "opt_model", "tests", "opt_toy_model.csv")
+    screening_file = os.path.join("opt_toy_model.csv")
+    # "primo", "opt_model", "tests",
     well_gdf = pd.read_csv(screening_file)
 
     # Introducing sample mobilization cost scheme
@@ -97,7 +98,6 @@ def test_build_opt_model(opt_model_inputs):
     assert isinstance(model.model.p_c, pyo.Param)
     assert isinstance(model.model.p_owc, pyo.Param)
     assert isinstance(model.model.p_B_sl, pyo.Param)
-    assert isinstance(model.model.p_B_s, pyo.Param)
     assert isinstance(model.model.p_B, pyo.Param)
     assert isinstance(model.model.v_y, pyo.Var)
     assert isinstance(model.model.v_q, pyo.Var)
@@ -109,7 +109,7 @@ def test_build_opt_model(opt_model_inputs):
     assert isinstance(model.model.obj, pyo.Objective)
 
     # Checking the minimum budget constraint is built when the budget is not sufficient
-    if model.model.p_B_s == 0:
+    if model.budget_sufficient == 0:
         assert isinstance(model.model.con_min_budget, pyo.Constraint)
 
 

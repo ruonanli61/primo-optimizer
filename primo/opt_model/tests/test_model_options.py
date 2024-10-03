@@ -90,6 +90,7 @@ def get_column_names_fixture():
     current_file = pathlib.Path(__file__).resolve()
     # primo folder is 2 levels up the current folder
     data_file = str(current_file.parents[2].joinpath("demo", "Example_1_data.csv"))
+    # str(current_file.parents[2].joinpath("demo", "Example_1_data.csv"))
     return im_metrics, col_names, data_file
 
 
@@ -148,6 +149,7 @@ def test_opt_model_inputs(get_column_names):
         mobilization_cost=mobilization_cost,
         threshold_distance=10,
         max_wells_per_owner=1,
+        min_budget_usage=50,
     )
 
     # Ensure that clustering is performed internally
@@ -321,8 +323,16 @@ def test_incremental_formulation(get_column_names):
     assert isinstance(opt_campaign[0], dict)
     assert isinstance(opt_campaign[1], dict)
 
+    # Test the structure of the optimization model
+    assert not hasattr(opt_mdl, "min_budget_usage_con")
+
+    # Check if the scaling factor for budget slack variable is correctly built
+    scaling_factor, budget_sufficient = opt_mdl.budget_slack_variable_scaling()
+    assert np.isclose(opt_mdl.slack_var_scaling(), 0)
+    assert not budget_sufficient
+
     # Four projects are chosen in the optimal campaign
-    assert len(opt_campaign[0]) == 4
+    assert len(opt_campaign[0]) == 5
 
     # Check if the required constraints are defined
     assert hasattr(opt_mdl.cluster[1], "calculate_num_wells_chosen")
@@ -357,6 +367,7 @@ def test_budget_slack_variable_scaling(get_column_names):
         mobilization_cost=mobilization_cost,
         threshold_distance=10,
         max_wells_per_owner=1,
+        min_budget_usage=50,
     )
 
     opt_mdl = opt_mdl_inputs.build_optimization_model()

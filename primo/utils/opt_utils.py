@@ -167,6 +167,7 @@ def is_pyomo_model_feasible(model: pyo.ConcreteModel, tol: float) -> bool:
     return True
 
 
+# TODO: delete this function after the demo notebook has been fully updated
 def budget_slack_variable_scaling(
     model_inputs: object, objective_weights: Dict[str, float]
 ) -> Tuple:

@@ -138,7 +138,7 @@ class OptModel(BaseModel):
             within=pyo.Reals,
         )
 
-        scaling_factor, budget_sufficient = budget_slack_variable_scaling(
+        scaling_factor, self.budget_sufficient = budget_slack_variable_scaling(
             model_inputs, objective_weights
         )
         model.p_B_sl = pyo.Param(
@@ -146,12 +146,6 @@ class OptModel(BaseModel):
             initialize=scaling_factor,
             mutable=False,
             within=pyo.PositiveReals,
-        )
-        model.p_B_s = pyo.Param(
-            doc="Whether the budget is sufficient to plug all wells",
-            initialize=int(budget_sufficient),
-            mutable=False,
-            within=pyo.NonNegativeReals,
         )
 
         LOGGER.info("Finished initializing parameters")
@@ -467,7 +461,7 @@ class OptModel(BaseModel):
         )
         LOGGER.info("Added a constraint to calculate the unutilized amount of budget")
 
-        if model.p_B_s == 0:
+        if self.budget_sufficient is False:
 
             def min_budget_usage(model):
                 """
