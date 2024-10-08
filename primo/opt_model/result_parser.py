@@ -302,14 +302,15 @@ class Campaign:
         # for now include a pointer to well data, so that I have column names
         self.wd = wd
         self.projects = {}
+        self.clusters_dict = clusters_dict
 
         index = 1
-        for cluster, wells in clusters_dict.items():
-            self.projects[index] = Project(
+        for cluster, wells in self.clusters_dict.items():
+            self.projects[cluster] = Project(
                 wd=wd,
                 index=wells,
                 plugging_cost=plugging_cost[cluster],
-                project_id=index,
+                project_id=cluster,
             )
             index += 1
 

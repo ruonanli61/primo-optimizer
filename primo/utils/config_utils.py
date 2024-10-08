@@ -582,7 +582,7 @@ class BaseSelectWidget:
         button_description: str,
         type_description: str,
     ):
-        self.choices = choices
+        self.choices = [str(choice) for choice in choices]
 
         # Initialize text
         self._text = ""
@@ -762,15 +762,11 @@ class SelectWidgetAdd(SelectWidget):
             min=min(self.wd.data[self.wd._col_names.cluster]),
             max=max(self.wd.data[self.wd._col_names.cluster]),
             step=1,
-            description="To Cluster:",
+            description="To Project:",
             disabled=False,
         )
 
         self.re_cluster_dict = {}
-
-    # def _on_change(self, _) -> None:
-    #     super()._on_change(_)
-    #     self.current_cluster = self.cluster_widget._pass_current_selection()
 
     def _add(self, _) -> None:
         super()._add(_)
@@ -781,7 +777,7 @@ class SelectWidgetAdd(SelectWidget):
 
     def _remove(self, _) -> None:
         super()._remove(_)
-        well_index = self.well_choices[
+        well_index = self.wd[
             self.wd.data[self.wd._col_names.well_id] == self._text
         ].index.item()
         self.re_cluster_dict[self.re_cluster.value].remove(well_index)
@@ -790,9 +786,12 @@ class SelectWidgetAdd(SelectWidget):
         """
         Display the widget and button in the Jupyter Notebook
         """
-        widget_box = widgets.HBox([self.widget, self.re_cluster])
-        buttons = widgets.HBox([self.button_add, self.button_remove])
-        vbox = widgets.VBox([widget_box, buttons])
+        # widget_box = widgets.HBox([self.widget, self.re_cluster])
+        # buttons = widgets.HBox([self.button_add, self.button_remove])
+        Vbox_left = widgets.VBox([self.widget, self.button_add])
+        Vbox_right = widgets.VBox([self.re_cluster, self.button_remove])
+
+        vbox = widgets.HBox([Vbox_left, Vbox_right])
         # vbox.layout.align_items = "flex-end"
         return vbox
 
@@ -804,103 +803,166 @@ class SelectWidgetAdd(SelectWidget):
 
 
 class UserSelection:
-    def __init__(self, well_selected: tuple, model_inputs):
-
+    def __init__(self, opt_campaign: tuple, model_inputs):
         self.wd = model_inputs.config.well_data
-        self.cluster_selected = list(well_selected.keys())
-        well_selected_list = [
-            well for wells in well_selected.values() for well in wells
+        self.opt_campaign = opt_campaign
+        self.cluster_selected = list(opt_campaign.keys())
+        self.well_selected_list = [
+            well for wells in opt_campaign.values() for well in wells
         ]
-        self.well_selected = self.wd._construct_sub_data(well_selected_list)
+        self.well_selected = self.wd._construct_sub_data(self.well_selected_list)
 
-        all_cluster = self.wd.data[self.wd._col_names.cluster].astype(str)
-        cluster_selected_choice = [str(cluster) for cluster in self.cluster_selected]
+        all_cluster = self.wd.data[self.wd._col_names.cluster]
+        self.cluster_remove_choice = [cluster for cluster in self.cluster_selected]
 
-        all_wells = self.wd.data.index
-        well_add_candidate_list = [
-            well for well in all_wells if well not in well_selected_list
-        ]
-        well_add_candidate = self.wd._construct_sub_data(well_add_candidate_list)
-        # well_add_candidate = self.wd.data[~self.wd.data.index.isin(well_selected_list)]
-        # well_add_candidate = self.wd.data[~self.wd.data[self.wd._col_names.well].isin(well_selected_list)]
-
-        self.add_widget = SelectWidgetAdd(
-            well_add_candidate, "Select wells to manually add", "Well"
-        )
+        self.all_wells = self.wd.data.index
 
         self.remove_widget = SubSelectWidget(
-            cluster_selected_choice,
+            self.cluster_remove_choice,
             "Select clusters to manually remove",
             "Select wells to manually remove",
             self.well_selected,
         )
 
-        self.unlock_widget = SubSelectWidget(
-            cluster_selected_choice,
-            "Select clusters to manually unlock",
-            "Select wells to manually unlock",
-            self.well_selected,
+        # Confirm button
+        layout = widgets.Layout(width="auto", height="50%")
+        self.button_remove_confirm = widgets.Button(
+            description="Confirm Removal", layout=layout
         )
-
-        self.widgets_dict = {
-            "Add": self.add_widget,
-            "Remove": self.remove_widget,
-            "Unlock": self.unlock_widget,
-        }
+        self.button_remove_confirm.on_click(self._process_remove_input)
 
     def display(self) -> None:
-        for action, widget in self.widgets_dict.items():
-            if action == "Add":
-                well_vbox = widget.display()
-                display(f"{action} wells", well_vbox)
-            else:
-                cluster_vbox = widget.cluster_widget.display()
-                well_vbox = widget.display()
-                widget = widgets.HBox([cluster_vbox, well_vbox])
-                display(f"{action} clusters/wells", widget)
+        # Display the remove_widget first
+        self._display_remove_widget()
+
+    def _display_remove_widget(self):
+        # Display remove_widget
+        cluster_vbox = self.remove_widget.cluster_widget.display()
+        well_vbox = self.remove_widget.display()
+        widget = widgets.HBox([cluster_vbox, well_vbox, self.button_remove_confirm])
+        display("Remove clusters/wells", widget)
+
+    def _process_remove_input(self, _):
+        # Get the user's selections from remove_widget
+        remove_selections_cluster = (
+            self.remove_widget.cluster_widget.return_selections()
+        )
+        remove_well = []
+        for remove_cluster in remove_selections_cluster:
+            remove_well += self.opt_campaign[remove_cluster]
+        remove_selections_well = (
+            self._return_well_index_cluster(self.remove_widget.return_selections())[1]
+            + remove_well
+        )
+
+        # Prepare add_widget and unlock_widget data
+        self._set_add_widget(remove_selections_well)
+        self._set_unlock_widget(remove_selections_cluster, remove_selections_well)
+
+        # Now display all widgets
+        self._display_all_widgets()
+
+    def _set_add_widget(self, remove_selections_well):
+        # Update add_widget with new well candidates
+        well_add_candidate_list = [
+            well for well in self.all_wells if well not in self.well_selected_list
+        ] + remove_selections_well
+        well_add_candidate = self.wd._construct_sub_data(well_add_candidate_list)
+
+        self.add_widget = SelectWidgetAdd(
+            well_add_candidate, "Select wells to manually add", "Add Well"
+        )
+
+    def _set_unlock_widget(self, remove_selections_cluster, remove_selections_well):
+        self.cluster_unlock_choice = [
+            cluster
+            for cluster in self.cluster_remove_choice
+            if cluster not in remove_selections_cluster
+        ]
+
+        well_unlock_list = [
+            well
+            for well in self.well_selected_list
+            if well not in remove_selections_well
+        ]
+        self.well_unlock_choice = self.wd._construct_sub_data(well_unlock_list)
+
+        self.unlock_widget = SubSelectWidget(
+            self.cluster_unlock_choice,
+            "Select clusters to manually unlock",
+            "Select wells to manually unlock",
+            self.well_unlock_choice,
+        )
+
+    def _display_all_widgets(self):
+        # Display add_widget and unlock_widget
+        add_widget = self.add_widget.display()
+
+        cluster_vbox = self.unlock_widget.cluster_widget.display()
+        well_vbox = self.unlock_widget.display()
+        unlock_widget = widgets.HBox([cluster_vbox, well_vbox])
+
+        # Combine all widgets into a single display
+        # combined_widget = widgets.VBox([add_widget, unlock_widget])
+        display("Add wells", add_widget)
+        display("Unlock clusters/wells", unlock_widget)
+
+    def _return_well_index_cluster(self, selections):
+        selections_dict = {}
+        selections_list = []
+        for well in selections:
+            well_index = self.wd.data[
+                self.wd.data[self.wd._col_names.well_id] == str(well)
+            ].index.item()
+            cluster = self.wd.data[
+                self.wd.data[self.wd._col_names.well_id] == str(well)
+            ][self.wd._col_names.cluster].item()
+            selections_dict.setdefault(cluster, []).append(well_index)
+            selections_list.append(well_index)
+        return selections_dict, selections_list
 
     def return_value(self):
         # def create_dict(selections, value):
         #     return {item: value for item in selections}
 
-        def return_well_index_cluster(selections):
-            selections_dict = {}
-            for well in selections:
-                well_index = self.wd.data[
-                    self.wd.data[self.wd._col_names.well_id] == str(well)
-                ].index.item()
-                cluster = self.wd.data[
-                    self.wd.data[self.wd._col_names.well_id] == str(well)
-                ][self.wd._col_names.cluster].item()
-                selections_dict.setdefault(cluster, []).append(well_index)
-            return selections_dict
-
         add_widget_return = (
-            return_well_index_cluster(self.add_widget.return_selections()[0]),
+            self._return_well_index_cluster(self.add_widget.return_selections()[0])[0],
             self.add_widget.return_selections()[1],
         )
 
         remove_widget_return = (
             self.remove_widget.cluster_widget.return_selections(),
-            return_well_index_cluster(self.remove_widget.return_selections()),
+            self._return_well_index_cluster(self.remove_widget.return_selections())[0],
         )
 
         cluster_unlock_list = self.unlock_widget.cluster_widget.return_selections()
         well_unlock_list = self.unlock_widget.return_selections()
         cluster_lock_list = [
             cluster
-            for cluster in self.cluster_selected
+            for cluster in self.cluster_unlock_choice
             if cluster not in cluster_unlock_list
         ]
+
+        well_unlock = [
+            well
+            for well in self.well_unlock_choice[self.wd._col_names.well_id]
+            if self.wd.data[
+                self.wd.data[self.wd._col_names.cluster].isin(cluster_unlock_list)
+            ][self.wd._col_names.well_id]
+            .isin([well])
+            .any()
+        ]
+        well_unlock_list += well_unlock
+
         well_lock_list = [
             well
-            for well in self.well_selected[self.wd._col_names.well_id]
+            for well in self.well_unlock_choice[self.wd._col_names.well_id]
             if well not in well_unlock_list
         ]
 
         unlock_widget_return = (
             cluster_lock_list,
-            return_well_index_cluster(well_lock_list),
+            self._return_well_index_cluster(well_lock_list)[0],
         )
 
         return [add_widget_return, remove_widget_return, unlock_widget_return]

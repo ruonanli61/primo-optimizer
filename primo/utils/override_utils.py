@@ -23,8 +23,7 @@ from haversine import Unit, haversine_vector
 
 # User-defined libs
 from primo.data_parser.data_model import OptInputs
-
-# from primo.opt_model.result_parser import OptimalCampaign
+from primo.opt_model.result_parser import Campaign
 from primo.utils.clustering_utils import distance_matrix
 from primo.utils.raise_exception import raise_exception
 
@@ -177,12 +176,15 @@ class OverrideCampaign:
         override_list: List,
         opt_inputs,
         opt_campaign: Dict,
+        eff_metrics,
     ):
+        logging.getLogger("Campaign").setLevel(logging.WARNING)
         opt_campaign_copy = copy.deepcopy(opt_campaign)
         self.new_campaign = opt_campaign_copy
         self.added = override_list[0]
         self.remove = override_list[1]
         self.opt_inputs = opt_inputs
+        self.eff_metrics = eff_metrics
 
         # form the new projects based on the override list
         # self.new_campaign.modified_project()
@@ -208,7 +210,7 @@ class OverrideCampaign:
 
         # add well with new cluster
         for cluster, well_list in self.added[1].items():
-            self.new_campaign[cluster] += well_list
+            self.new_campaign.setdefault(cluster, []).extend(well_list)
 
         # remove clusters
         for cluster in self.remove[0]:
@@ -258,11 +260,15 @@ class OverrideCampaign:
         return violation_info_dict
 
     def override_campaign(self):
-        return self.new_campaign
+        plugging_cost = self.feasibility.campaign_cost_dict
+        return Campaign(self.wd, self.new_campaign, plugging_cost)
 
-    # TODO activate after efficiency PR being merged
-    #     plugging_cost = self.feasibility.campaign_cost_dict
-    #     return OptimalCampaign(self.wd, self.new_campaign, plugging_cost)
+    def recalculate(self):
+        logging.disable(logging.CRITICAL)
+        override_campaign = self.override_campaign()
+        override_campaign.set_efficiency_weights(self.eff_metrics)
+        override_campaign.compute_efficiency_scores()
+        print(override_campaign)
 
 
 # Retain to be used when implementing the backfill feature
