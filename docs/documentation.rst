@@ -1,7 +1,6 @@
-Explain PRIMO in One Page
-=========================
+PRIMO Explained in One Page
+===========================
 
-A documentation has been created to demonstrate PRIMO in non-technical terms. 
 
 .. figure:: _static/PRIMO_Tool_Flyer.png
 
