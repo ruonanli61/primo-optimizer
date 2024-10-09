@@ -183,6 +183,7 @@ class OverrideCampaign:
         self.new_campaign = opt_campaign_copy
         self.added = override_list[0]
         self.remove = override_list[1]
+        self.lock = override_list[2]
         self.opt_inputs = opt_inputs
         self.eff_metrics = eff_metrics
 
@@ -269,6 +270,41 @@ class OverrideCampaign:
         override_campaign.set_efficiency_weights(self.eff_metrics)
         override_campaign.compute_efficiency_scores()
         print(override_campaign)
+
+    def _re_optimize_dict(self):
+        re_optimize_dict = {}
+        re_optimize_well_dict = {}
+        # for cluster, well_list in self.added[0].items():
+        #     if cluster in self.new_campaign.keys():
+        #         for well in well_list:
+        #             if well in self.new_campaign[cluster]:
+        #                 self.new_campaign[cluster].remove(well)
+
+        # # add well with new cluster
+        # for cluster, well_list in self.added[1].items():
+        #     self.new_campaign.setdefault(cluster, []).extend(well_list)
+
+        # assign 0 to clusters being removed
+        for cluster in self.remove[0]:
+            re_optimize_dict[cluster] = 0
+
+        # assign 0 to wells being removed
+        for cluster, well_list in self.remove[1].items():
+            for well in well_list:
+                well_dict[well] = 0
+            re_optimize_well_dict[cluster] = well_dict
+
+        # assign 1 to wells being locked
+        for cluster, well_list in self.lock.items():
+            well_dict = re_optimize_dict[cluster]
+            for well in well_list:
+                well_dict[well] = 1
+            re_optimize_well_dict[cluster] = well_dict
+
+        return re_optimize_well_dict
+
+
+# def re_optimize():
 
 
 # Retain to be used when implementing the backfill feature
