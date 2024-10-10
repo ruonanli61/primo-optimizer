@@ -203,16 +203,6 @@ class OverrideCampaign:
         )
 
     def _modify_campaign(self):
-        for cluster, well_list in self.added[0].items():
-            if cluster in self.new_campaign.keys():
-                for well in well_list:
-                    if well in self.new_campaign[cluster]:
-                        self.new_campaign[cluster].remove(well)
-
-        # add well with new cluster
-        for cluster, well_list in self.added[1].items():
-            self.new_campaign.setdefault(cluster, []).extend(well_list)
-
         # remove clusters
         for cluster in self.remove[0]:
             del self.new_campaign[cluster]
@@ -221,6 +211,16 @@ class OverrideCampaign:
         for cluster, well_list in self.remove[1].items():
             for well in well_list:
                 self.new_campaign[cluster].remove(well)
+
+        # for cluster, well_list in self.added[0].items():
+        #     if cluster in self.new_campaign.keys():
+        #         for well in well_list:
+        #             if well in self.new_campaign[cluster]:
+        #                 self.new_campaign[cluster].remove(well)
+
+        # add well with new cluster
+        for cluster, well_list in self.added[1].items():
+            self.new_campaign.setdefault(cluster, []).extend(well_list)
 
     def violation_info(self):
         violation_info_dict = {}
