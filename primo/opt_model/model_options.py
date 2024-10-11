@@ -264,10 +264,10 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             for cluster, well_list in self.campaign_candidates.items()
         }
 
-    def build_optimization_model(self):
+    def build_optimization_model(self, override_dict=None):
         """Builds the optimization model"""
         LOGGER.info("Beginning to construct the optimization model.")
-        self._opt_model = PluggingCampaignModel(self)
+        self._opt_model = PluggingCampaignModel(self, override_dict)
         LOGGER.info("Completed the construction of the optimization model.")
         return self._opt_model
 
@@ -311,3 +311,35 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         # In all other cases, return the optimal campaign
         return self._opt_model.get_optimal_campaign()
+
+    def update_cluster(self, add_widget_return):
+        """
+        Updates the campaign candidates by changing the cluster numbers for specific wells.
+
+        Args:
+            new_cluster_to_wells (dict): A dictionary mapping new clusters to lists of wells.
+        """
+        existing_clusters = add_widget_return.existing_cluster
+        new_clusters = add_widget_return.new_cluster
+        wd = self.config.well_data
+        col_names = wd.col_names
+
+        # Remove wells from existing clusters and update owner well counts
+        for existing_cluster, existing_wells in existing_clusters.items():
+            for well in existing_wells:
+                self.campaign_candidates[existing_cluster].remove(well)
+                self.owner_well_count[
+                    wd.data.loc[well, col_names.operator_name]
+                ].remove((existing_cluster, well))
+
+        # Add wells to new clusters and update the well data and owner well counts
+        for new_cluster, wells in new_clusters.items():
+            for well in wells:
+                self.campaign_candidates[new_cluster].append(well)
+                self.config.well_data.data.loc[well, col_names.cluster] = new_cluster
+                self.owner_well_count[
+                    wd.data.loc[well, col_names.operator_name]
+                ].append((new_cluster, well))
+
+        # Update pairwise distances based on the new well data
+        self.pairwise_distance = self._pairwise_matrix(metric="distance")

@@ -159,8 +159,8 @@ class OverrideCampaign:
 
     Parameters
     ----------
-    override_list: list
-        A list with well add, well remove, and well lock information
+    override_list: OverrideSelections
+        Object containing the override selections
 
     opt_inputs: OptModelInputs
         Object containing the necessary inputs for the optimization model
@@ -173,7 +173,7 @@ class OverrideCampaign:
 
     def __init__(
         self,
-        override_list: List,
+        override_selections,
         opt_inputs,
         opt_campaign: Dict,
         eff_metrics,
@@ -181,16 +181,12 @@ class OverrideCampaign:
         logging.getLogger("Campaign").setLevel(logging.WARNING)
         opt_campaign_copy = copy.deepcopy(opt_campaign)
         self.new_campaign = opt_campaign_copy
-        self.added = override_list[0]
-        self.remove = override_list[1]
-        self.lock = override_list[2]
+        self.remove = override_selections.remove_widget_return
+        self.added = override_selections.add_widget_return
+        self.lock = override_selections.lock_widget_return
         self.opt_inputs = opt_inputs
         self.eff_metrics = eff_metrics
 
-        # form the new projects based on the override list
-        # self.new_campaign.modified_project()
-
-        # def modified_project(self):
         # change well cluster
         self._modify_campaign()
         self.plug_list = []
@@ -204,22 +200,16 @@ class OverrideCampaign:
 
     def _modify_campaign(self):
         # remove clusters
-        for cluster in self.remove[0]:
+        for cluster in self.remove.cluster:
             del self.new_campaign[cluster]
 
         # remove wells
-        for cluster, well_list in self.remove[1].items():
+        for cluster, well_list in self.remove.well.items():
             for well in well_list:
                 self.new_campaign[cluster].remove(well)
 
-        # for cluster, well_list in self.added[0].items():
-        #     if cluster in self.new_campaign.keys():
-        #         for well in well_list:
-        #             if well in self.new_campaign[cluster]:
-        #                 self.new_campaign[cluster].remove(well)
-
         # add well with new cluster
-        for cluster, well_list in self.added[1].items():
+        for cluster, well_list in self.added.new_cluster.items():
             self.new_campaign.setdefault(cluster, []).extend(well_list)
 
     def violation_info(self):
@@ -271,40 +261,37 @@ class OverrideCampaign:
         override_campaign.compute_efficiency_scores()
         print(override_campaign)
 
-    def _re_optimize_dict(self):
-        re_optimize_dict = {}
+    def re_optimize_dict(self):
+        re_optimize_cluster_dict = {}
         re_optimize_well_dict = {}
-        # for cluster, well_list in self.added[0].items():
-        #     if cluster in self.new_campaign.keys():
-        #         for well in well_list:
-        #             if well in self.new_campaign[cluster]:
-        #                 self.new_campaign[cluster].remove(well)
 
-        # # add well with new cluster
-        # for cluster, well_list in self.added[1].items():
-        #     self.new_campaign.setdefault(cluster, []).extend(well_list)
+        # Assign 0 to clusters being removed
+        for cluster in self.remove.cluster:
+            re_optimize_cluster_dict[cluster] = 0
 
-        # assign 0 to clusters being removed
-        for cluster in self.remove[0]:
-            re_optimize_dict[cluster] = 0
+        # Assign 0 to wells being removed
+        for cluster, well_list in self.remove.well.items():
+            re_optimize_well_dict[cluster] = {well: 0 for well in well_list}
 
-        # assign 0 to wells being removed
-        for cluster, well_list in self.remove[1].items():
+        # Assign 1 to wells being added
+        for cluster, well_list in self.added.new_cluster.items():
+            if cluster not in re_optimize_well_dict:
+                re_optimize_well_dict[cluster] = {}
             for well in well_list:
-                well_dict[well] = 0
-            re_optimize_well_dict[cluster] = well_dict
+                re_optimize_well_dict[cluster][well] = 1
 
-        # assign 1 to wells being locked
-        for cluster, well_list in self.lock.items():
-            well_dict = re_optimize_dict[cluster]
+        # Assign 1 to clusters being locked
+        for cluster in self.lock.cluster:
+            re_optimize_cluster_dict[cluster] = 1
+
+        # Assign 1 to wells being locked
+        for cluster, well_list in self.lock.well.items():
+            if cluster not in re_optimize_well_dict:
+                re_optimize_well_dict[cluster] = {}
             for well in well_list:
-                well_dict[well] = 1
-            re_optimize_well_dict[cluster] = well_dict
+                re_optimize_well_dict[cluster][well] = 1
 
-        return re_optimize_well_dict
-
-
-# def re_optimize():
+        return re_optimize_cluster_dict, re_optimize_well_dict
 
 
 # Retain to be used when implementing the backfill feature
