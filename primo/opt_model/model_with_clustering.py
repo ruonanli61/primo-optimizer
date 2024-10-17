@@ -307,6 +307,8 @@ class PluggingCampaignModel(ConcreteModel):
     Builds the optimization model
     """
 
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, model_inputs, *args, **kwargs):
         """
         Builds the optimization model for identifying the set of projects that
@@ -335,10 +337,16 @@ class PluggingCampaignModel(ConcreteModel):
             initialize=scaling_factor,
             mutable=True,
             within=NonNegativeReals,
-            doc="Unused budget variable coefficient in the objective function",
+            doc="Unused budget variable scaling factor in the objective function",
+        )
+
+        self.unused_budget = Var(
+            within=NonNegativeReals,
+            doc="The unutilized amount of total budget",
         )
 
         # Define essential variables and constraints for each cluster
+        # pylint: disable=undefined-variable
         self.cluster = ClusterBlock(self.set_clusters, rule=build_cluster_model)
 
         # Add total budget constraint
@@ -409,13 +417,16 @@ class PluggingCampaignModel(ConcreteModel):
 
     def add_min_budget_usage(self):
         """
-        Implements the upper bound on the unused budget to ensure at
-        least the certain percentage budget that specified by user is used.
+        Implements an upper bound on the unused budget to ensure that at
+        least the specified percentage of the budget is utilized.
         """
-        min_percent = self.model_inputs.config.min_budget_usage / 100
-        max_unused_budget = (1 - min_percent) * self.total_budget
 
-        # Define variable for unutilized budget
+        max_unused_budget = (
+            1 - self.model_inputs.config.min_budget_usage / 100
+        ) * self.total_budget
+
+        # Define upper bound for unutilized budget
+        # pylint: disable=no-member
         self.unused_budget.setub(max_unused_budget)
 
     def append_objective(self):
