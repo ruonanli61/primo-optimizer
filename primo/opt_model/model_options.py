@@ -31,7 +31,7 @@ from pyomo.environ import SolverFactory
 # User-defined libs
 from primo.data_parser import WellData
 from primo.opt_model.model_with_clustering import PluggingCampaignModel
-from primo.utils import check_optimal_termination, get_solver
+from primo.utils import get_solver
 from primo.utils.clustering_utils import distance_matrix, perform_clustering
 from primo.utils.domain_validators import InRange, validate_mobilization_cost
 from primo.utils.raise_exception import raise_exception
@@ -142,7 +142,10 @@ def model_config() -> ConfigDict:
         ConfigValue(
             default=False,
             domain=Bool,
-            doc="If True, the slack variable for the budget will be active",
+            doc=(
+                "If True, unused budget will be penalized in the objective function\n"
+                "with suitably chosen weight factor"
+            ),
         ),
     )
 
