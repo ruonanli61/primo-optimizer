@@ -888,14 +888,13 @@ class UserSelection:
     def __init__(self, opt_campaign: dict, model_inputs: object):
         self.wd = model_inputs.config.well_data
         self.opt_campaign = opt_campaign
-        self.cluster_selected = list(opt_campaign.keys())
         self.well_selected_list = [
             well for wells in opt_campaign.values() for well in wells
         ]
         self.well_selected = self.wd._construct_sub_data(self.well_selected_list)
 
-        all_cluster = self.wd.data[self.wd._col_names.cluster]
-        self.cluster_remove_choice = [cluster for cluster in self.cluster_selected]
+        # all_cluster = self.wd.data[self.wd._col_names.cluster]
+        self.cluster_remove_choice = list(opt_campaign.keys())
 
         self.all_wells = self.wd.data.index
 

@@ -13,14 +13,24 @@
 
 # Standard libs
 import os
+import pathlib
 
 # Installed libs
+import ipywidgets as widgets
 import playwright
 import pytest
 
 # User-defined libs
+from primo.data_parser import ImpactMetrics, WellData, WellDataColumnNames
+from primo.opt_model.model_options import OptModelInputs
+from primo.opt_model.tests.test_model_options import get_column_names_fixture
 from primo.utils.config_utils import (
-    SelectWidget,
+    AddWidgetReturn,
+    OverrideSelections,
+    SelectWidgetAdd,
+    SubSelectWidget,
+    UserSelection,
+    WidgetReturn,
     _get_checkbox_params,
     copy_dict,
     copy_values,
@@ -252,32 +262,82 @@ def test_get_checkbox_params(param_dict, expected_result):
     assert _get_checkbox_params(param_dict) == expected_result
 
 
+@pytest.fixture()
+def get_model_fixture(get_column_names):
+    im_metrics, col_names, filename = get_column_names
+
+    # Create the well data object
+    wd = WellData(data=filename, column_names=col_names, impact_metrics=im_metrics)
+
+    # Partition the wells as gas/oil
+    gas_oil_wells = wd.get_gas_oil_wells
+    wd_gas = gas_oil_wells["gas"]
+
+    # Mobilization cost
+    mobilization_cost = {1: 120000, 2: 210000, 3: 280000, 4: 350000}
+    for n_wells in range(5, len(wd_gas) + 1):
+        mobilization_cost[n_wells] = n_wells * 84000
+
+    wd_gas.compute_priority_scores()
+
+    # Formulate the optimization problem
+    opt_mdl_inputs = OptModelInputs(
+        well_data=wd_gas,
+        total_budget=3250000,  # 3.25 million USD
+        mobilization_cost=mobilization_cost,
+        threshold_distance=10,
+        max_wells_per_owner=1,
+        min_budget_usage=50,
+    )
+
+    opt_mdl_inputs.build_optimization_model()
+    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+
+    return opt_campaign, opt_mdl_inputs
+
+
 @pytest.mark.widgets
-def test_select_widget(solara_test, page_session: playwright.sync_api.Page):
-    choices = ["Apple", "Banana", "Mango"]
-    button_description = "Select fruit"
-    type_description = "Fruit"
-    widget_class = SelectWidget(choices, button_description, type_description)
-    widget_class.display()
+def test_user_selection(
+    solara_test, page_session: playwright.sync_api.Page, get_model_fixture
+):
+    opt_campaign, opt_mdl_inputs = get_model_fixture
+
+    or_wid_class = UserSelection(opt_campaign.clusters_dict, opt_mdl_inputs)
+
+    # Test the structure of the override widget
+    assert hasattr(or_wid_class, "wd")
+    assert hasattr(or_wid_class, "opt_campaign")
+    assert 789 in or_wid_class.well_selected_list
+    assert isinstance(or_wid_class.well_selected, WellData)
+    assert 789 in or_wid_class.well_selected.data.index
+    assert 1 in or_wid_class.cluster_remove_choice
+    assert len(or_wid_class.all_wells) == len(opt_mdl_inputs.config.well_data)
+    assert isinstance(or_wid_class.remove_widget, SubSelectWidget)
+    assert isinstance(or_wid_class.button_remove_confirm, widgets.Button)
+    assert not hasattr(or_wid_class, "add_widget")
+    assert not hasattr(or_wid_class, "lock_widget")
+
+    or_wid_class.display()
 
     # Assert list is empty initially
-    assert not widget_class.selected_list
+    assert not or_wid_class.remove_widget.cluster_widget.selected_list
+    assert not or_wid_class.remove_widget.selected_list
 
-    # Add Apple to form
-    page_session.get_by_label("Fruit").fill("Apple")
+    # Remove project 13
+    page_session.get_by_label("13").fill("13")
     select_button = page_session.locator("text=Select fruit")
-    select_button.click()
+    or_wid_class.button_remove_confirm.click()
 
-    assert widget_class.selected_list == ["Apple"]
+    assert or_wid_class.remove_widget.cluster_widget.selected_list == ["13"]
 
-    # Add Banana to form
-    page_session.get_by_label("Fruit").fill("Banana")
-    select_button.click()
-    assert widget_class.selected_list == ["Apple", "Banana"]
+    # # Add Banana to form
+    # page_session.get_by_label("Fruit").fill("Banana")
+    # select_button.click()
+    # assert widget_class.selected_list == ["Apple", "Banana"]
 
-    # Unselect recent selection
-    undo_button = page_session.locator("text=Undo")
-    undo_button.click()
-    assert widget_class.selected_list == ["Apple"]
+    # # Unselect recent selection
+    # undo_button = page_session.locator("text=Undo")
+    # undo_button.click()
+    # assert widget_class.selected_list == ["Apple"]
 
-    # TODO: Add more tests
+    # # TODO: Add more tests
