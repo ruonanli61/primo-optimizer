@@ -332,9 +332,9 @@ class PluggingCampaignModel(ConcreteModel):
             mutable=True,
             doc="Total budget available [Million USD]",
         )
-        scaling_factor, budget_sufficient = self.unused_budget_variable_scaling()
+
         self.unused_budget_scaling = Param(
-            initialize=scaling_factor,
+            initialize=0,
             mutable=True,
             within=NonNegativeReals,
             doc="Unused budget variable scaling factor in the objective function",
@@ -373,12 +373,17 @@ class PluggingCampaignModel(ConcreteModel):
         if model_inputs.config.max_wells_per_owner is not None:
             self.add_owner_well_count()
 
+        scaling_factor, budget_sufficient = self._unused_budget_variable_scaling()
         if model_inputs.config.min_budget_usage is not None:
-            if budget_sufficient is False:
+            if budget_sufficient:
+                LOGGER.warning(
+                    "Ignoring min_budget_usage as the total_budget is sufficient to plug all wells."
+                )
+            else:
                 self.add_min_budget_usage()
 
-        if model_inputs.config.budget_slack_usage is False:
-            self.unused_budget_scaling = 0
+        if model_inputs.config.penalize_unused_budget:
+            self.unused_budget_scaling = scaling_factor
 
         # Append the objective function
         self.append_objective()
@@ -442,7 +447,7 @@ class PluggingCampaignModel(ConcreteModel):
             doc="Total Priority score minus scaled slack variable for unutilized budget",
         )
 
-    def unused_budget_variable_scaling(self):
+    def _unused_budget_variable_scaling(self):
         """
         Check whether the budget is sufficient to plug all wells and
         calculate the scaling factor for the budget slack variable based on the

@@ -134,11 +134,11 @@ def model_config() -> ConfigDict:
         ConfigValue(
             default=None,
             domain=InRange(0, 100),
-            doc="The min percent of the budget usage when it is insufficient",
+            doc="Minimum percentage of the total budget to be used for plugging",
         ),
     )
     config.declare(
-        "budget_slack_usage",
+        "penalize_unused_budget",
         ConfigValue(
             default=False,
             domain=Bool,

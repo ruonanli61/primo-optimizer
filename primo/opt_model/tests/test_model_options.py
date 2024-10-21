@@ -152,7 +152,7 @@ def test_opt_model_inputs(get_column_names):
         threshold_distance=10,
         max_wells_per_owner=1,
         min_budget_usage=50,
-        budget_slack_usage=True,
+        penalize_unused_budget=True,
     )
 
     # Ensure that clustering is performed internally
@@ -200,7 +200,8 @@ def test_opt_model_inputs(get_column_names):
     assert hasattr(opt_mdl, "total_priority_score")
 
     # Check if the scaling factor for unused budget variable is correctly built
-    scaling_factor, budget_sufficient = opt_mdl.unused_budget_variable_scaling()
+    # pylint: disable=protected-access
+    scaling_factor, budget_sufficient = opt_mdl._unused_budget_variable_scaling()
     assert np.isclose(scaling_factor, 955.6699386511185)
     assert not budget_sufficient
 
@@ -327,7 +328,8 @@ def test_incremental_formulation(get_column_names):
     # assert isinstance(opt_campaign[1], dict)
 
     # Check if the scaling factor for budget slack variable is correctly built
-    _, budget_sufficient = opt_mdl.unused_budget_variable_scaling()
+    # pylint: disable=protected-access
+    _, budget_sufficient = opt_mdl._unused_budget_variable_scaling()
     # pylint: disable=no-member
     assert np.isclose(opt_mdl.unused_budget_scaling.value, 0)
     assert not budget_sufficient
@@ -374,13 +376,14 @@ def test_unused_budget_variable_scaling(get_column_names):
         threshold_distance=10,
         max_wells_per_owner=1,
         min_budget_usage=50,
-        budget_slack_usage=True,
+        penalize_unused_budget=True,
     )
 
     opt_mdl = opt_mdl_inputs.build_optimization_model()
 
     # Check if the scaling factor for budget slack variable is correctly built
-    scaling_factor, budget_sufficient = opt_mdl.unused_budget_variable_scaling()
+    # pylint: disable=protected-access
+    scaling_factor, budget_sufficient = opt_mdl._unused_budget_variable_scaling()
     assert np.isclose(scaling_factor, 105.71767887503083)
     assert budget_sufficient
 
