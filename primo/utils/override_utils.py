@@ -15,17 +15,14 @@
 import copy
 import logging
 from itertools import combinations
-from typing import Dict, List, Optional
+from typing import Dict
 
 # Installed libs
 import pandas as pd
-from haversine import Unit, haversine_vector
 
 # User-defined libs
-from primo.data_parser.data_model import OptInputs
 from primo.opt_model.result_parser import Campaign
 from primo.utils.clustering_utils import distance_matrix
-from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,10 +30,29 @@ LOGGER = logging.getLogger(__name__)
 class AssessFeasibility:
     """
     Class for assessing whether the overridden P&A projects adhere to the constraints
-    defined in the optimization problem
+    defined in the optimization problem.
 
     Parameters
     ----------
+    opt_inputs : OptModelInputs
+        The optimization model inputs that define the parameters and constraints of the problem.
+
+    opt_campaign : Dict
+        A dictionary representing the proposed campaign of projects, including the wells and their
+        associated costs or configurations.
+
+    wd : WellData
+        An object containing well data used for assessing project feasibility, including
+        well characteristics and historical data.
+
+    plug_list : List
+        A list of plug types or methods that will be considered in the assessment of the projects.
+
+    Attributes
+    ----------
+    campaign_cost_dict : Dict
+        A dictionary that will hold the cost calculations for the projects within the campaign,
+        mapped to their respective project identifiers.
     """
 
     def __init__(self, opt_inputs, opt_campaign: Dict, wd, plug_list):
@@ -87,6 +103,7 @@ class AssessFeasibility:
         return opt_inputs.perc_wells_in_dac - dac_percent
 
     def assess_owner_well_count(self) -> Dict:
+        # pylint: disable=protected-access
         """
         Assess whether the owner well count constraint is violated or not.
         Returns list of owners and wells selected for each for whom the owner
@@ -105,6 +122,7 @@ class AssessFeasibility:
         return violated_operators
 
     def assess_distances(self) -> Dict:
+        # pylint: disable=protected-access
         """
         Assess whether the maximum distance between two wells constraint is violated or not
         """
@@ -152,6 +170,7 @@ class AssessFeasibility:
         return True
 
 
+# pylint: disable=too-many-instance-attributes
 class OverrideCampaign:
     """
     Class for constructing new campaigns based on the override results
@@ -159,16 +178,19 @@ class OverrideCampaign:
 
     Parameters
     ----------
-    override_list: OverrideSelections
+    override_selections : OverrideSelections
         Object containing the override selections
 
-    opt_inputs: OptModelInputs
+    opt_inputs : OptModelInputs
         Object containing the necessary inputs for the optimization model
 
-    opt_campaign: dict
+    opt_campaign : dict
         A dictionary for the original suggested P&A project
         where keys are cluster numbers and values
         are list of wells for each cluster.
+
+    eff_metrics : EfficiencyMetrics
+        The efficiency metrics
     """
 
     def __init__(
@@ -190,7 +212,7 @@ class OverrideCampaign:
         # change well cluster
         self._modify_campaign()
         self.plug_list = []
-        for cluster, well_list in self.new_campaign.items():
+        for _, well_list in self.new_campaign.items():
             self.plug_list += well_list
         self.wd = self.opt_inputs.config.well_data._construct_sub_data(self.plug_list)
 
@@ -199,20 +221,29 @@ class OverrideCampaign:
         )
 
     def _modify_campaign(self):
+        """
+        Modify the original suggested P&A project
+        """
         # remove clusters
         for cluster in self.remove.cluster:
             del self.new_campaign[cluster]
 
         # remove wells
         for cluster, well_list in self.remove.well.items():
-            for well in well_list:
-                self.new_campaign[cluster].remove(well)
+            if cluster not in self.remove.cluster:
+                for well in well_list:
+                    self.new_campaign[cluster].remove(well)
 
         # add well with new cluster
         for cluster, well_list in self.add.new_cluster.items():
             self.new_campaign.setdefault(cluster, []).extend(well_list)
 
     def violation_info(self):
+        """
+        Return information on constraints that the new campaign
+        have violated.
+        """
+        # pylint: disable=trailing-whitespace
         violation_info_dict = {}
         if self.feasibility.assess_feasibility() is False:
             violation_info_dict = {"Project Status:": "INFEASIBLE"}
@@ -222,28 +253,39 @@ class OverrideCampaign:
             violate_dac = self.feasibility.assess_dac()
 
             if violate_cost > 0:
-                msg = f""" After the modification, the total budget is over the limit by ${int(violate_cost)}. Please consider modifying wells you have selected by either using the widget above or by re-running the optimization problem."""
+                msg = f""" After the modification, the total budget is over 
+                the limit by ${int(violate_cost)}. Please consider modifying 
+                wells you have selected by either using the widget above or 
+                by re-running the optimization problem."""
+
                 violation_info_dict[msg] = """"""
 
             if violate_operator:
-                msg = f""" After the modification, the following owners have more than {self.opt_inputs.config.max_wells_per_owner} well(s) 
-                                being selected. Please consider modifying wells you have selected by either using the widget above or by re-running
-                                the optimization problem."""
+                msg = f""" After the modification, the following owners have 
+                more than {self.opt_inputs.config.max_wells_per_owner} well(s) 
+                being selected. Please consider modifying wells you have 
+                selected by either using the widget above or by re-running
+                the optimization problem."""
 
                 violate_operator_df = pd.DataFrame.from_dict(violate_operator)
                 violation_info_dict[msg] = violate_operator_df
 
             if violate_distance:
-                msg = """ After the modification, the following projects have wells are far away from each others. 
-                                Please consider modifying wells you have selected by either using the widget above or by 
-                                re-running the optimization problem."""
+                msg = """ After the modification, the following projects have 
+                wells are far away from each others. Please consider modifying 
+                wells you have selected by either using the widget above or by 
+                re-running the optimization problem."""
 
                 violate_distance_df = pd.DataFrame.from_dict(violate_distance)
                 violation_info_dict[msg] = violate_distance_df
 
             if violate_dac > 0:
                 dac_percent = self.opt_inputs.config.perc_wells_in_dac - violate_dac
-                msg = f""" After the modification, {int(dac_percent)}% of well is in DAC. Please consider modifying wells you have selected by either using the widget above or by re-running the optimization problem."""
+                msg = f""" After the modification, {int(dac_percent)}% of well 
+                is in DAC. Please consider modifying wells you have selected 
+                by either using the widget above or by re-running the optimization 
+                problem."""
+                # pylint: disable=trailing-whitespace
                 violation_info_dict[msg] = """"""
         else:
             violation_info_dict = {"Project Status:": "FEASIBLE"}
@@ -251,10 +293,16 @@ class OverrideCampaign:
         return violation_info_dict
 
     def override_campaign(self):
+        """
+        Construct the new Campaign object based on the override selection
+        """
         plugging_cost = self.feasibility.campaign_cost_dict
         return Campaign(self.wd, self.new_campaign, plugging_cost)
 
     def recalculate(self):
+        """
+        Construct the new Campaign object based on the override selection
+        """
         logging.disable(logging.CRITICAL)
         override_campaign = self.override_campaign()
         override_campaign.set_efficiency_weights(self.eff_metrics)
@@ -262,6 +310,10 @@ class OverrideCampaign:
         return override_campaign
 
     def re_optimize_dict(self):
+        """
+        Generate dictionaries for clusters and wells to be fixed based on
+        the override selection
+        """
         re_optimize_cluster_dict = {}
         re_optimize_well_dict = {}
 
@@ -292,163 +344,3 @@ class OverrideCampaign:
                 re_optimize_well_dict[cluster][well] = 1
 
         return re_optimize_cluster_dict, re_optimize_well_dict
-
-
-# Retain to be used when implementing the backfill feature
-# class BackFill:
-#     """
-#     Class for assessing whether the overridden P&A projects adhere to the constraints
-#     defined in the optimization problem
-
-#     Parameters
-#     ----------
-
-#     selected_wells : pd.DataFrame
-#         A DataFrame containing wells selected based on solving the optimization problem
-#         and/or by manual selections and overrides
-
-#     wells_added : List[str]
-#         A list of wells that the user wishes to add to the P&A projects
-
-#     wells_removed : List[str]
-#         A list of wells that the user wishes to remove from the P&A projects
-
-#     well_df : pd.DataFrame
-#         A DataFrame that includes all candidate wells
-
-#     opt_inputs : OptInputs
-#         Input object for the optimization problem
-
-#     dac_weight : int
-#         An integer for the weight assigned to the DAC priority factor.
-
-#     Attributes
-#     ----------
-
-#     original_wells : pd.DataFrame
-#         List of original wells selected for plugging
-
-#     wells_added : List[str]
-#         List of wells to be added for plugging
-
-#     wells_removed : List[str]
-#         List of wells to be removed from plugging projects
-
-#     well_df : pd.DataFrame
-#         Full data associated with all wells
-
-#     opt_inputs : OptInputs
-#         The inputs associated with the optimization problem
-
-#     dac_weight : Union[float, None]
-#         An integer for the weight assigned to the DAC priority factor.
-
-#     """
-
-#     # pylint: disable=too-many-arguments
-#     def __init__(
-#         self,
-#         override_list: List,
-#         opt_inputs: OptModelInputs,
-#     ):
-#         self.wells = opt_inputs.config.well_data
-#         self.campaign = opt_inputs.campaign_candidates
-#         self.wells_added = [int(well_id) for well_id in wells_added]
-#         self.wells_removed = [int(well_id) for well_id in wells_removed]
-#         # self.opt_inputs = opt_inputs
-#         self.dac_weight = opt_inputs.config.perc_wells_in_dac
-
-#         # Get list of wells to be plugged (opt results + user overrides)
-#         added_wells = well_df[well_df["API Well Number"].isin(self.wells_added)]
-#         self._plugged_list = pd.concat([original_wells.copy(), added_wells])
-
-#         # Get list of wells to be removed from plugging
-#         self._plugged_list = self._plugged_list[
-#             ~self._plugged_list["API Well Number"].isin(self.wells_removed)
-#         ]
-
-#     def _add_well(self, well_id: int):
-#         """
-#         Adds a well in the considerations for plugging
-#         """
-#         if well_id in self.wells_added:
-#             msg = f"Well: {well_id} was already included in plugging list"
-#             LOGGER.warning(msg)
-#             print(msg)
-#             return
-
-#         if well_id in self.wells_removed:
-#             raise_exception(
-#                 f"Well: {well_id} was already included in removal list", ValueError
-#             )
-
-#         self.wells_added.append(well_id)
-#         self._plugged_list = pd.concat(
-#             [
-#                 self._plugged_list,
-#                 self.well_df[self.well_df["API Well Number"] == well_id],
-#             ]
-#         )
-#         return
-
-#     def _remove_well(self, well_id: int):
-#         """
-#         Removes a well from the considerations for plugging
-#         """
-#         if well_id in self.wells_removed:
-#             raise_exception(
-#                 f"Well: {well_id} was already included in removal list", ValueError
-#             )
-
-#         if well_id in self.wells_added:
-#             self.wells_added.remove(well_id)
-
-#         self._plugged_list = self._plugged_list[
-#             self._plugged_list["API Well Number"] != well_id
-#         ]
-
-
-#     def backfill(self) -> List[str]:
-#         """
-#         If current selections (either due to manual overrides or termination of solver
-#         prior to optimality)
-#         leave room for budget, the method returns a list of candidates that can
-#         be added to the plugging projects without violating any constraints
-
-#         Parameters:
-#         ----------
-#         None
-
-#         Returns:
-#         --------
-#         List of well API numbers that can be added in the project
-#         """
-#         additions = []
-#         if self.assess_feasibility() is False:
-#             # The current well selections already lead to infeasibility (presumably
-#             # due to budget being exceeded)
-#             # There is no room to add more wells for backfilling
-#             return additions
-
-#         # Sort by descending order
-#         candidates = self.well_df.sort_values("Priority Score [0-100]", ascending=False)
-
-#         # Only include those candidates not considered for plugging
-#         candidates = candidates[
-#             ~candidates["API Well Number"].isin(self._plugged_list["API Well Number"])
-#         ]
-
-#         # Remove candidates in removal list
-#         candidates = candidates[~candidates["API Well Number"].isin(self.wells_removed)]
-#         # Stick to those projects that already exist
-#         existing_projects = set(self._plugged_list["Project"])
-#         candidates = candidates[candidates["Project"].isin(existing_projects)]
-
-#         for well_id in candidates["API Well Number"]:
-#             self._add_well(well_id)
-#             if self.assess_feasibility():
-#                 additions.append(well_id)
-#             else:
-#                 self._remove_well(well_id)
-
-#         return additions

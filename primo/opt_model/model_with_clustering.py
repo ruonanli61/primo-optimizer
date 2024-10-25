@@ -313,7 +313,10 @@ class PluggingCampaignModel(ConcreteModel):
         model_inputs : OptModelInputs
             Object containing the necessary inputs for the optimization model
 
-        override :
+        override_dict : tuple
+            A tuple including a dictionary for clusters being fixed:
+            key=> cluster, value => 0 or 1, and a dictionary for a list of
+            wells being fixed in each cluster: key =>cluster, value: list
         """
         super().__init__(*args, **kwargs)
 

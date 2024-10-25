@@ -34,6 +34,7 @@ from primo.utils.config_utils import AddWidgetReturn
 LOGGER = logging.getLogger(__name__)
 
 # pylint: disable=missing-function-docstring
+# pylint: disable=duplicate-code
 
 
 @pytest.fixture(name="get_column_names", scope="function")
@@ -392,7 +393,6 @@ def test_unused_budget_variable_scaling(get_column_names):
     assert opt_mdl.unused_budget.upper is None
 
 
-@pytest.mark.scip
 # pylint: disable=too-many-locals
 def test_override_re_optimization(get_column_names):
     im_metrics, col_names, filename = get_column_names
@@ -441,14 +441,15 @@ def test_override_re_optimization(get_column_names):
     well_add_new_cluster = {11: [80], 6: [600], 10: [734], 40: [601]}
 
     add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
+    initial_opt_mdl_inputs = copy.deepcopy(opt_mdl_inputs)
 
     opt_mdl_inputs.build_optimization_model()
-    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    opt_campaign = opt_mdl_inputs.solve_model(solver="highs")
+
     assert hasattr(opt_mdl_inputs, "update_cluster")
     assert 13 in opt_campaign.projects
 
     # Update the model input based on the override selection
-    initial_opt_mdl_inputs = copy.deepcopy(opt_mdl_inputs)
     opt_mdl_inputs.update_cluster(add_widget_return)
 
     assert (
@@ -459,7 +460,7 @@ def test_override_re_optimization(get_column_names):
 
     # Build the new optimization model based on the override selection
     or_opt_mdl = opt_mdl_inputs.build_optimization_model(override_dict)
-    or_opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    or_opt_campaign = opt_mdl_inputs.solve_model(solver="highs")
 
     assert hasattr(or_opt_mdl, "fix_var")
 
@@ -523,7 +524,7 @@ def test_re_cluster(get_column_names):
     add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
 
     opt_mdl_inputs.build_optimization_model()
-    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    opt_campaign = opt_mdl_inputs.solve_model(solver="highs")
     assert hasattr(opt_mdl_inputs, "update_cluster")
     assert 13 in opt_campaign.projects
 

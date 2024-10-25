@@ -13,23 +13,15 @@
 
 # Standard libs
 import os
-import pathlib
 
 # Installed libs
 import ipywidgets as widgets
-import numpy as np
 import playwright
 import pytest
 
 # User-defined libs
-from primo.data_parser import (
-    EfficiencyMetrics,
-    ImpactMetrics,
-    WellData,
-    WellDataColumnNames,
-)
+from primo.data_parser import EfficiencyMetrics, WellData
 from primo.opt_model.model_options import OptModelInputs
-from primo.opt_model.tests.test_model_options import get_column_names_fixture
 from primo.utils.config_utils import (
     AddWidgetReturn,
     OverrideSelections,
@@ -45,6 +37,8 @@ from primo.utils.config_utils import (
     read_defaults,
     update_defaults,
 )
+
+# pylint: disable=missing-function-docstring
 
 
 @pytest.mark.parametrize(
@@ -168,11 +162,15 @@ def test_is_valid(input_dict, reference_dict, result):
     ],
 )
 def test_read_config(monkeypatch, path, expected_result):
+    # pylint: disable=unused-argument
     def mock_exists(p):
         return p == "valid_config.json"
 
-    def mock_open(p, mode):
+    def mock_open(p, _):
         class MockFile:
+            """
+            A mock implementation of a file object for testing purposes."""
+
             def read(self):
                 return '{"key": "value"}'
 
@@ -317,13 +315,14 @@ def get_model_fixture(get_column_names, eff_metric):
     )
 
     opt_mdl_inputs.build_optimization_model()
-    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    opt_campaign = opt_mdl_inputs.solve_model(solver="highs")
 
     return opt_campaign, opt_mdl_inputs, eff_metrics
 
 
 @pytest.mark.widgets
-def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get_model):
+def test_user_selection(page_session: playwright.sync_api.Page, get_model):
+    # pylint: disable=protected-access, too-many-statements
     opt_campaign, opt_mdl_inputs, _ = get_model
 
     or_wid_class = UserSelection(opt_campaign.clusters_dict, opt_mdl_inputs)
@@ -376,7 +375,6 @@ def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get
         "19",
     )
     assert or_wid_class.remove_widget.cluster_widget._text == "13"
-    cluster = or_wid_class.remove_widget._pass_current_selection()
     assert or_wid_class.remove_widget.widget.options == ()
     page_session.get_by_label("Well").fill("1")
     page_session.wait_for_timeout(2000)
@@ -400,8 +398,7 @@ def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get
     page_session.wait_for_timeout(2000)
     assert or_wid_class.remove_widget.selected_list == ["48446", "84290"]
 
-    # Unselect recent selection
-    project_undo_button = page_session.locator("text=Undo").nth(0)
+    # Withdraw recent selection
     well_undo_button = page_session.locator("text=Undo").nth(1)
     well_undo_button.click()
     page_session.wait_for_timeout(2000)
@@ -432,7 +429,7 @@ def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get
     ):
         or_wid_class.add_widget._add(None)
 
-    # Unselect None
+    # Withdraw None
     or_wid_class.add_widget._text = ""
     with pytest.raises(ValueError, match="Nothing selected, cannot remove from list"):
         or_wid_class.add_widget._remove(None)
@@ -445,7 +442,7 @@ def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get
     assert or_wid_class.add_widget.selected_list == ["94343", "69254"]
     assert or_wid_class.add_widget.re_cluster_dict == {1: [80], 6: [600]}
 
-    # Unselect well 69254
+    # Withdraw the selection of well 69254
     or_wid_class.add_widget._remove("69254")
     assert or_wid_class.add_widget.selected_list == ["94343"]
     assert or_wid_class.add_widget.re_cluster_dict == {1: [80], 6: []}

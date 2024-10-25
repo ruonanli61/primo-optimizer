@@ -64,6 +64,7 @@ ipywidgets
 iterable
 json
 libs
+monkeypatch
 msg
 multicommodity
 nanmean
