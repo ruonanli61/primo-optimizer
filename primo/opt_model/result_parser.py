@@ -472,9 +472,10 @@ class Campaign:
 
         project_column = [project.project_id for _, project in self.projects.items()]
 
+        first_key = list(self.projects.keys())[0]
         names_attributes = [
             attribute_name
-            for attribute_name in dir(self.projects[1])
+            for attribute_name in dir(self.projects[first_key])
             if "eff_score" in attribute_name
         ]
 
@@ -488,7 +489,7 @@ class Campaign:
             for attr in names_attributes
         ]
 
-        if self.projects[1].accessibility_score is not None:
+        if self.projects[first_key].accessibility_score is not None:
             # accessibility score
             total_weights, accessibility_data = map(
                 list,
@@ -539,7 +540,8 @@ class Campaign:
         campaign_category : str
             The label for the category of the campaign (e.g., "oil", "gas")
         """
-        col_names = self.projects[1]._col_names
+        first_key = list(self.projects.keys())[0]
+        col_names = self.projects[first_key]._col_names
         # the priority score must have been previously computed
         assert hasattr(col_names, "priority_score")
         columns_to_export = [

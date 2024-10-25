@@ -20,8 +20,7 @@ from typing import Any, List, Tuple
 
 # Installed libs
 import ipywidgets as widgets
-from fast_autocomplete import AutoComplete
-from IPython.display import display
+from IPython.display import clear_output, display
 
 # User-defined libs
 from primo.utils.raise_exception import raise_exception
@@ -614,60 +613,54 @@ class BaseSelectWidget:
         self.button_remove = widgets.Button(description="Undo", layout=layout)
         self.button_remove.on_click(self._remove)
 
+        # Output widget for displaying messages
+        self.output = widgets.Output()
+
         self.selected_list = []
 
     def _on_change(self, data) -> None:
         """
-        Dynamically update the list of choices available in the drop down widget
-        based on what is already selected
+        Dynamically update the currently selection
         """
-        # AutoComplete box requires a dictionary
-        words_dict = {word: {} for word in self.choices}
-        self._autocomplete = AutoComplete(words=words_dict)
-
         self._text = data["new"]
 
-        values = self._autocomplete.search(self._text, max_cost=3, size=3)
-
-        # convert nested list to flat list
-        values = list(sorted(set(str(item) for sublist in values for item in sublist)))
-
-        self.widget.options = values
+        self.widget.options = self.choices
 
     def _add(self, _) -> None:
         """
         Adds a selected choice and prints confirmation message in Jupyter notebook
         """
-
-        if self._text == "":
-            raise_exception("Nothing selected, cannot add to list", ValueError)
-        if self._text in self.selected_list:
-            msg = f"Choice: {self._text} already included in list of selections"
-            LOGGER.info(msg)
-            print(msg)
-        else:
-            self.selected_list.append(self._text)
-            msg = f"Choice {self._text} has been added to the list of selections"
-            LOGGER.info(msg)
-            print(msg)
+        with self.output:
+            if self._text == "":
+                raise_exception("Nothing selected, cannot add to list", ValueError)
+            if self._text in self.selected_list:
+                raise_exception(
+                    f"Choice {self._text} already included in list of selections",
+                    ValueError,
+                )
+            else:
+                self.selected_list.append(self._text)
+                msg = f"Choice {self._text} has been added to the list of selections"
+                LOGGER.info(msg)
+                print(msg)
 
     def _remove(self, _) -> None:
         """
         Remove a selected choice and prints confirmation message in Jupyter Notebook
         """
-
-        if self._text == "":
-            raise_exception("Nothing selected, cannot remove from list", ValueError)
-        if self._text not in self.selected_list:
-            raise_exception(
-                f"Choice {self._text} is not in the list",
-                ValueError,
-            )
-        else:
-            self.selected_list.remove(self._text)
-            msg = f"Choice {self._text} has been removed from the list."
-            LOGGER.info(msg)
-            print(msg)
+        with self.output:
+            if self._text == "":
+                raise_exception("Nothing selected, cannot remove from list", ValueError)
+            if self._text not in self.selected_list:
+                raise_exception(
+                    f"Choice {self._text} is not in the list",
+                    ValueError,
+                )
+            else:
+                self.selected_list.remove(self._text)
+                msg = f"Choice {self._text} has been removed from the list."
+                LOGGER.info(msg)
+                print(msg)
 
     def display(self):
         """
@@ -676,7 +669,7 @@ class BaseSelectWidget:
         buttons = widgets.HBox([self.button_add, self.button_remove])
         vbox = widgets.VBox([self.widget, buttons])
         vbox.layout.align_items = "flex-end"
-        return vbox
+        return vbox, self.output
 
     def return_selections(self) -> List[int]:
         """
@@ -736,21 +729,16 @@ class SubSelectWidget(BaseSelectWidget):
         """
 
         # obtain the current cluster selection
+        self._text = data["new"]
+
         cluster = self.cluster_widget._pass_current_selection()
         # obtain the well candidates under the selected cluster
+
         well_candidate = self.wd.data[
             self.wd.data[self.wd._col_names.cluster] == int(cluster)
         ][self.wd._col_names.well_id]
 
-        words_dict = {word: {} for word in well_candidate}
-
-        self._autocomplete = AutoComplete(words=words_dict)
-
-        self._text = data["new"]
-
-        values = self._autocomplete.search(self._text, max_cost=3, size=3)
-
-        values = list(sorted(set(str(item) for sublist in values for item in sublist)))
+        values = list(well_candidate)
 
         self.widget.options = values
 
@@ -836,8 +824,6 @@ class SelectWidgetAdd(SelectWidget):
                 self.re_cluster.value = cluster_value[
                     0
                 ]  # Update to the cluster of the selected well
-            else:
-                self.re_cluster.value = 0  # Default if no cluster found
 
     def _add(self, _) -> None:
         super()._add(_)
@@ -863,7 +849,7 @@ class SelectWidgetAdd(SelectWidget):
         Vbox_right = widgets.VBox([self.re_cluster, buttons])
         Vbox_right.layout.align_items = "flex-end"
         vbox = widgets.HBox([Vbox_left, Vbox_right])
-        return vbox
+        return vbox, self.output
 
     def return_selections(self) -> List[int]:
         """
@@ -893,7 +879,6 @@ class UserSelection:
         ]
         self.well_selected = self.wd._construct_sub_data(self.well_selected_list)
 
-        # all_cluster = self.wd.data[self.wd._col_names.cluster]
         self.cluster_remove_choice = list(opt_campaign.keys())
 
         self.all_wells = self.wd.data.index
@@ -905,12 +890,16 @@ class UserSelection:
             self.well_selected,
         )
 
+        self.add_widget = SelectWidgetAdd(self.wd, "", "")
+        self.lock_widget = SubSelectWidget([], "", "", self.wd)
+
         # Confirm button
         layout = widgets.Layout(width="auto", height="50%")
         self.button_remove_confirm = widgets.Button(
             description="Confirm Removal", layout=layout
         )
         self.button_remove_confirm.on_click(self._process_remove_input)
+        self.output = widgets.Output()
 
     def display(self) -> None:
         """Display the remove_widget"""
@@ -918,36 +907,51 @@ class UserSelection:
 
     def _display_remove_widget(self):
         """Construct and display the remove_widget"""
-        cluster_vbox = self.remove_widget.cluster_widget.display()
-        well_vbox = self.remove_widget.display()
+        cluster_vbox, cluster_output = self.remove_widget.cluster_widget.display()
+        well_vbox, well_output = self.remove_widget.display()
         widget = widgets.HBox([cluster_vbox, well_vbox, self.button_remove_confirm])
-        display("Remove projects/wells", widget)
+        output = widgets.VBox([cluster_output, well_output, self.output])
+        remove_widget_container = widgets.VBox([widget, output])
+
+        widget_placeholder = widgets.Label(
+            "Add and lock widgets will display here after clicking Confirm Removal button."
+        )
+
+        # Combine everything into a container for display
+        container = widgets.VBox([remove_widget_container, widget_placeholder])
+
+        display("Remove projects/wells", container)
 
     def _process_remove_input(self, _):
         """Construct the cluster and well candidates for the add_widget and lock_widget
         based on the removed projects and wells"""
 
-        # obtain projects that have been removed
-        remove_selections_cluster = (
-            self.remove_widget.cluster_widget.return_selections()
-        )
+        with self.output:
+            clear_output(wait=True)  # Clear previous output
 
-        # obtain wells that have been removed both from the cluster
-        # and well selection widgets
-        remove_well = []
-        for remove_cluster in remove_selections_cluster:
-            remove_well += self.opt_campaign[remove_cluster]
-        remove_selections_well = (
-            self._return_well_index_cluster(self.remove_widget.return_selections())[1]
-            + remove_well
-        )
+            # obtain projects that have been removed
+            remove_selections_cluster = (
+                self.remove_widget.cluster_widget.return_selections()
+            )
 
-        # prepare add_widget and unlock_widget data
-        self._set_add_widget(remove_selections_well)
-        self._set_lock_widget(remove_selections_cluster, remove_selections_well)
+            # obtain wells that have been removed both from the cluster
+            # and well selection widgets
+            remove_well = []
+            for remove_cluster in remove_selections_cluster:
+                remove_well += self.opt_campaign[remove_cluster]
+            remove_selections_well = (
+                self._return_well_index_cluster(self.remove_widget.return_selections())[
+                    1
+                ]
+                + remove_well
+            )
 
-        # display both the add_widget and lock_widget at the same time
-        self._display_all_widgets()
+            # prepare add_widget and unlock_widget data
+            self._set_add_widget(remove_selections_well)
+            self._set_lock_widget(remove_selections_cluster, remove_selections_well)
+
+            # display both the add_widget and lock_widget at the same time
+            self._display_all_widgets()
 
     def _set_add_widget(self, remove_selections_well):
         """Set up the widget for adding wells"""
@@ -984,16 +988,18 @@ class UserSelection:
 
     def _display_all_widgets(self):
         """Display both the add_widget and lock_widget"""
-        add_widget = self.add_widget.display()
 
-        cluster_vbox = self.lock_widget.cluster_widget.display()
-        well_vbox = self.lock_widget.display()
-        unlock_widget = widgets.HBox([cluster_vbox, well_vbox])
+        add_widget, add_output = self.add_widget.display()
+        add_container = widgets.VBox([add_widget, add_output])
 
-        # Combine all widgets into a single display
-        # combined_widget = widgets.VBox([add_widget, unlock_widget])
-        display("Add wells", add_widget)
-        display("Lock projects/wells", unlock_widget)
+        cluster_vbox, cluster_output = self.lock_widget.cluster_widget.display()
+        well_vbox, well_output = self.lock_widget.display()
+        lock_widget = widgets.HBox([cluster_vbox, well_vbox])
+        lock_output = widgets.VBox([cluster_output, well_output])
+        lock_container = widgets.VBox([lock_widget, lock_output])
+
+        display("Add wells", add_container)
+        display("Lock projects/wells", lock_container)
 
     def _return_well_index_cluster(self, selections):
         """Obtain index of selected wells according to their API Well Number"""

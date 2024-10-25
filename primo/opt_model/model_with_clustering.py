@@ -425,7 +425,8 @@ class PluggingCampaignModel(ConcreteModel):
     def fix_var(self, override_dict):
         """
         Fixes the binary variables associated with the cluster
-        and/or the wells with in the cluster
+        and/or the wells with in the cluster based on the override
+        selection
 
         Parameters
         ----------
@@ -439,8 +440,6 @@ class PluggingCampaignModel(ConcreteModel):
 
         # Combine clusters and remove duplicates using a set
         unique_clusters = set(cluster_fix_dict.keys()).union(set(well_fix_dict.keys()))
-
-        # Convert back to a list if needed
         unique_clusters_list = list(unique_clusters)
 
         for c in unique_clusters_list:

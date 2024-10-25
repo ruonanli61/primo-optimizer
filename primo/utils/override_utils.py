@@ -82,7 +82,7 @@ class AssessFeasibility:
         disadvantaged_wells = sum(
             self.wd.data.loc[well, "is_disadvantaged"] for well in self.plug_list
         )
-        dac_percent = disadvantaged_wells / len(self.plug_list)
+        dac_percent = disadvantaged_wells / len(self.plug_list) * 100
 
         return opt_inputs.perc_wells_in_dac - dac_percent
 
@@ -182,7 +182,7 @@ class OverrideCampaign:
         opt_campaign_copy = copy.deepcopy(opt_campaign)
         self.new_campaign = opt_campaign_copy
         self.remove = override_selections.remove_widget_return
-        self.added = override_selections.add_widget_return
+        self.add = override_selections.add_widget_return
         self.lock = override_selections.lock_widget_return
         self.opt_inputs = opt_inputs
         self.eff_metrics = eff_metrics
@@ -209,7 +209,7 @@ class OverrideCampaign:
                 self.new_campaign[cluster].remove(well)
 
         # add well with new cluster
-        for cluster, well_list in self.added.new_cluster.items():
+        for cluster, well_list in self.add.new_cluster.items():
             self.new_campaign.setdefault(cluster, []).extend(well_list)
 
     def violation_info(self):
@@ -259,7 +259,7 @@ class OverrideCampaign:
         override_campaign = self.override_campaign()
         override_campaign.set_efficiency_weights(self.eff_metrics)
         override_campaign.compute_efficiency_scores()
-        print(override_campaign)
+        return override_campaign
 
     def re_optimize_dict(self):
         re_optimize_cluster_dict = {}
@@ -274,7 +274,7 @@ class OverrideCampaign:
             re_optimize_well_dict[cluster] = {well: 0 for well in well_list}
 
         # Assign 1 to wells being added
-        for cluster, well_list in self.added.new_cluster.items():
+        for cluster, well_list in self.add.new_cluster.items():
             if cluster not in re_optimize_well_dict:
                 re_optimize_well_dict[cluster] = {}
             for well in well_list:
