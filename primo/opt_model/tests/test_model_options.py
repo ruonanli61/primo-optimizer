@@ -12,6 +12,7 @@
 #################################################################################
 
 # Standard libs
+import copy
 import logging
 import pathlib
 
@@ -29,6 +30,7 @@ from primo.opt_model.model_with_clustering import (  # pylint: disable=no-name-i
     PluggingCampaignModel,
 )
 from primo.opt_model.result_parser import Campaign, Project
+from primo.utils.config_utils import AddWidgetReturn
 
 LOGGER = logging.getLogger(__name__)
 
@@ -181,7 +183,6 @@ def test_opt_model_inputs(get_column_names):
     assert isinstance(solver, SCIPAMPL)
     assert isinstance(opt_campaign, Campaign)
     assert isinstance(opt_campaign.projects[1], Project)
-    # assert isinstance(opt_campaign[1], dict)
 
     # Four projects are chosen in the optimal campaign
     assert len(opt_campaign.projects) == 5
@@ -254,7 +255,7 @@ def test_opt_model_inputs(get_column_names):
     assert not opt_mdl.cluster[1].plugging_cost.is_fixed()
 
     # Test fix and unfix methods
-    opt_mdl.cluster[1].fix()
+    opt_mdl.cluster[1].fix(0)
     # since no arguments are specified only cluster variable is fixed
     # at its incumbent value, which is zero based on earlier operations
     assert opt_mdl.cluster[1].select_cluster.is_fixed()
@@ -374,3 +375,160 @@ def test_budget_slack_variable_scaling(get_column_names):
     scaling_factor, budget_sufficient = opt_mdl.budget_slack_variable_scaling()
     assert np.isclose(scaling_factor, 105.71767887503083)
     assert budget_sufficient
+
+
+@pytest.mark.scip
+def test_override_re_optimization(get_column_names):
+    im_metrics, col_names, filename = get_column_names
+
+    # Create the well data object
+    wd = WellData(data=filename, column_names=col_names, impact_metrics=im_metrics)
+
+    # Partition the wells as gas/oil
+    gas_oil_wells = wd.get_gas_oil_wells
+    wd_gas = gas_oil_wells["gas"]
+
+    # Mobilization cost
+    mobilization_cost = {1: 120000, 2: 210000, 3: 280000, 4: 350000}
+    for n_wells in range(5, len(wd_gas.data) + 1):
+        mobilization_cost[n_wells] = n_wells * 84000
+
+    # Test the model and options
+    wd_gas.compute_priority_scores()
+
+    opt_mdl_inputs = OptModelInputs(
+        well_data=wd_gas,
+        total_budget=3210000,  # 3.25 million USD
+        mobilization_cost=mobilization_cost,
+        threshold_distance=10,
+        max_wells_per_owner=1,
+    )
+
+    override_dict = (
+        {13: 0, 19: 1},
+        {
+            1: {851: 0, 858: 0},
+            11: {80: 1},
+            6: {600: 1},
+            19: {21: 1, 83: 1, 182: 1, 280: 1, 981: 1},
+            10: {734: 1},
+            40: {601: 1},
+        },
+    )
+
+    well_add_existing_cluster = {
+        6: [600],
+        11: [80],
+        10: [734],
+        40: [601],
+    }
+    well_add_new_cluster = {11: [80], 6: [600], 10: [734], 40: [601]}
+
+    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
+
+    opt_mdl = opt_mdl_inputs.build_optimization_model()
+    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    assert hasattr(opt_mdl_inputs, "update_cluster")
+    assert 13 in opt_campaign.projects
+
+    # Update the model input based on the override selection
+    initial_opt_mdl_inputs = copy.deepcopy(opt_mdl_inputs)
+    opt_mdl_inputs.update_cluster(add_widget_return)
+
+    assert (
+        opt_mdl_inputs.campaign_candidates == initial_opt_mdl_inputs.campaign_candidates
+    )
+    assert opt_mdl_inputs.owner_well_count == initial_opt_mdl_inputs.owner_well_count
+    assert opt_mdl_inputs.pairwise_distance == initial_opt_mdl_inputs.pairwise_distance
+
+    # Build the new optimization model based on the override selection
+    or_opt_mdl = opt_mdl_inputs.build_optimization_model(override_dict)
+    or_opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+
+    assert hasattr(or_opt_mdl, "fix_var")
+
+    # Ensure clusters and wells are fixed based on the override selection
+    assert or_opt_mdl.cluster[13].select_cluster.is_fixed()
+    assert or_opt_mdl.cluster[13].select_cluster.value == 0
+    for j in or_opt_mdl.cluster[13].select_well:
+        assert not or_opt_mdl.cluster[13].select_well[j].is_fixed()
+
+    assert or_opt_mdl.cluster[19].select_cluster.is_fixed()
+    assert or_opt_mdl.cluster[19].select_cluster.value == 1
+    for j in override_dict[1][19]:
+        assert or_opt_mdl.cluster[19].select_well[j].is_fixed()
+        assert or_opt_mdl.cluster[19].select_well[j].value == override_dict[1][19][j]
+
+    assert not or_opt_mdl.cluster[1].select_cluster.is_fixed()
+
+    # Test the re-optimization results
+    assert 13 not in or_opt_campaign.projects
+    assert 80 in or_opt_campaign.projects[11].well_data.data.index
+    assert 600 in or_opt_campaign.projects[6].well_data.data.index
+    assert 851 not in or_opt_campaign.projects[1].well_data.data.index
+    assert or_opt_campaign.clusters_dict[19] == [21, 83, 182, 280, 981]
+
+
+def test_re_cluster(get_column_names):
+    im_metrics, col_names, filename = get_column_names
+
+    # Create the well data object
+    wd = WellData(data=filename, column_names=col_names, impact_metrics=im_metrics)
+
+    # Partition the wells as gas/oil
+    gas_oil_wells = wd.get_gas_oil_wells
+    wd_gas = gas_oil_wells["gas"]
+
+    # Mobilization cost
+    mobilization_cost = {1: 120000, 2: 210000, 3: 280000, 4: 350000}
+    for n_wells in range(5, len(wd_gas.data) + 1):
+        mobilization_cost[n_wells] = n_wells * 84000
+
+    # Test the model and options
+    wd_gas.compute_priority_scores()
+
+    opt_mdl_inputs = OptModelInputs(
+        well_data=wd_gas,
+        total_budget=3210000,  # 3.25 million USD
+        mobilization_cost=mobilization_cost,
+        threshold_distance=10,
+        max_wells_per_owner=1,
+    )
+
+    override_dict = (
+        {13: 0, 19: 1},
+        {
+            1: {851: 0, 858: 0},
+            11: {80: 1},
+            6: {600: 1},
+            10: {21: 1},
+            19: {21: 1, 83: 1, 182: 1, 280: 1, 981: 0},
+            40: {601: 1},
+        },
+    )
+
+    well_add_existing_cluster = {
+        6: [600],
+        11: [80],
+        19: [981],
+        40: [601],
+    }
+    well_add_new_cluster = {11: [80], 6: [600], 10: [981], 40: [601]}
+
+    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
+
+    opt_mdl = opt_mdl_inputs.build_optimization_model()
+    opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
+    assert hasattr(opt_mdl_inputs, "update_cluster")
+    assert 13 in opt_campaign.projects
+
+    # Update the model input based on the override selection
+    initial_opt_mdl_inputs = copy.deepcopy(opt_mdl_inputs)
+    opt_mdl_inputs.update_cluster(add_widget_return)
+
+    assert 981 not in opt_mdl_inputs.campaign_candidates[19]
+    assert 981 in opt_mdl_inputs.campaign_candidates[10]
+    assert (10, 981) in opt_mdl_inputs.owner_well_count["Owner 104"]
+    assert (19, 981) not in opt_mdl_inputs.owner_well_count["Owner 104"]
+    assert any(981 in key for key in opt_mdl_inputs.pairwise_distance[10])
+    assert not any(981 in key for key in opt_mdl_inputs.pairwise_distance[19])
