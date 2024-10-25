@@ -33,7 +33,6 @@ dependencies = [
     "censusgeocode",
     "folium",
     "geopandas",
-    "gurobipy",
     "highspy",
     "haversine",
     "ipyfilechooser",
@@ -42,7 +41,7 @@ dependencies = [
     "kneed",
     "matplotlib",
     "notebook",
-    "numpy<=1.28",
+    "numpy",
     "openpyxl",
     "pandas",
     "pyarrow",
@@ -94,6 +93,9 @@ test = [
     "pytest-playwright"
 ]
 
+gurobi = [
+    "gurobipy"
+]
 [project.scripts]
 stagedfright = "stagedfright:main"
 
