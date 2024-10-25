@@ -17,11 +17,17 @@ import pathlib
 
 # Installed libs
 import ipywidgets as widgets
+import numpy as np
 import playwright
 import pytest
 
 # User-defined libs
-from primo.data_parser import ImpactMetrics, WellData, WellDataColumnNames
+from primo.data_parser import (
+    EfficiencyMetrics,
+    ImpactMetrics,
+    WellData,
+    WellDataColumnNames,
+)
 from primo.opt_model.model_options import OptModelInputs
 from primo.opt_model.tests.test_model_options import get_column_names_fixture
 from primo.utils.config_utils import (
@@ -262,12 +268,33 @@ def test_get_checkbox_params(param_dict, expected_result):
     assert _get_checkbox_params(param_dict) == expected_result
 
 
-@pytest.fixture()
-def get_model_fixture(get_column_names):
+@pytest.fixture(name="eff_metric")
+def efficiency_metrics_fixture():
+    eff_metrics = EfficiencyMetrics()
+    eff_metrics.set_weight(
+        primary_metrics={
+            "num_wells": 20,
+            "num_unique_owners": 30,
+            "avg_elevation_delta": 20,
+            "age_range": 10,
+            "depth_range": 20,
+        }
+    )
+    return eff_metrics
+
+
+@pytest.fixture(name="get_model")
+def get_model_fixture(get_column_names, eff_metric):
     im_metrics, col_names, filename = get_column_names
+    eff_metrics = eff_metric
 
     # Create the well data object
-    wd = WellData(data=filename, column_names=col_names, impact_metrics=im_metrics)
+    wd = WellData(
+        data=filename,
+        column_names=col_names,
+        impact_metrics=im_metrics,
+        efficiency_metrics=eff_metrics,
+    )
 
     # Partition the wells as gas/oil
     gas_oil_wells = wd.get_gas_oil_wells
@@ -283,24 +310,21 @@ def get_model_fixture(get_column_names):
     # Formulate the optimization problem
     opt_mdl_inputs = OptModelInputs(
         well_data=wd_gas,
-        total_budget=3250000,  # 3.25 million USD
+        total_budget=3210000,  # 3.25 million USD
         mobilization_cost=mobilization_cost,
         threshold_distance=10,
         max_wells_per_owner=1,
-        min_budget_usage=50,
     )
 
     opt_mdl_inputs.build_optimization_model()
     opt_campaign = opt_mdl_inputs.solve_model(solver="scip")
 
-    return opt_campaign, opt_mdl_inputs
+    return opt_campaign, opt_mdl_inputs, eff_metrics
 
 
 @pytest.mark.widgets
-def test_user_selection(
-    solara_test, page_session: playwright.sync_api.Page, get_model_fixture
-):
-    opt_campaign, opt_mdl_inputs = get_model_fixture
+def test_user_selection(solara_test, page_session: playwright.sync_api.Page, get_model):
+    opt_campaign, opt_mdl_inputs, _ = get_model
 
     or_wid_class = UserSelection(opt_campaign.clusters_dict, opt_mdl_inputs)
 
@@ -314,30 +338,152 @@ def test_user_selection(
     assert len(or_wid_class.all_wells) == len(opt_mdl_inputs.config.well_data)
     assert isinstance(or_wid_class.remove_widget, SubSelectWidget)
     assert isinstance(or_wid_class.button_remove_confirm, widgets.Button)
-    assert not hasattr(or_wid_class, "add_widget")
-    assert not hasattr(or_wid_class, "lock_widget")
+    assert isinstance(or_wid_class.add_widget, SelectWidgetAdd)
+    assert isinstance(or_wid_class.lock_widget, SubSelectWidget)
+    assert hasattr(or_wid_class.add_widget, "re_cluster")
+    assert isinstance(or_wid_class.add_widget.re_cluster, widgets.BoundedIntText)
 
     or_wid_class.display()
 
     # Assert list is empty initially
     assert not or_wid_class.remove_widget.cluster_widget.selected_list
     assert not or_wid_class.remove_widget.selected_list
+    assert isinstance(
+        or_wid_class.remove_widget.cluster_widget.button_add, widgets.Button
+    )
+    assert isinstance(
+        or_wid_class.remove_widget.cluster_widget.button_remove, widgets.Button
+    )
+    assert isinstance(
+        or_wid_class.remove_widget.cluster_widget.widget, widgets.Combobox
+    )
+    assert isinstance(or_wid_class.remove_widget.button_add, widgets.Button)
+    assert isinstance(or_wid_class.remove_widget.button_remove, widgets.Button)
+    assert isinstance(or_wid_class.remove_widget.widget, widgets.Combobox)
 
     # Remove project 13
-    page_session.get_by_label("13").fill("13")
-    select_button = page_session.locator("text=Select fruit")
+    page_session.get_by_label("Project").fill("13")
+    page_session.wait_for_timeout(2000)
+    project_remove_button = page_session.locator(
+        "text=Select projects to manually remove"
+    )
+    project_remove_button.click()
+    assert or_wid_class.remove_widget.cluster_widget.selected_list == ["13"]
+    assert or_wid_class.remove_widget.cluster_widget.widget.options == (
+        "1",
+        "11",
+        "13",
+        "19",
+    )
+    assert or_wid_class.remove_widget.cluster_widget._text == "13"
+    cluster = or_wid_class.remove_widget._pass_current_selection()
+    assert or_wid_class.remove_widget.widget.options == ()
+    page_session.get_by_label("Well").fill("1")
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.remove_widget.widget.options == (
+        "16079",
+        "50038",
+        "46413",
+        "13528",
+    )
+
+    # Remove well 48446, index 789
+    page_session.get_by_label("Well").fill("48446")
+    well_remove_button = page_session.locator("text=Select wells to manually remove")
+    well_remove_button.click()
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.remove_widget.selected_list == ["48446"]
+
+    # Remove well 84290, index 829
+    page_session.get_by_label("Well").fill("84290")
+    well_remove_button.click()
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.remove_widget.selected_list == ["48446", "84290"]
+
+    # Unselect recent selection
+    project_undo_button = page_session.locator("text=Undo").nth(0)
+    well_undo_button = page_session.locator("text=Undo").nth(1)
+    well_undo_button.click()
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.remove_widget.selected_list == ["48446"]
+
+    # Test the confirm removal button
+    assert not hasattr(or_wid_class, "cluster_lock_choice")
+    assert not hasattr(or_wid_class, "well_lock_choice")
+
     or_wid_class.button_remove_confirm.click()
 
-    assert or_wid_class.remove_widget.cluster_widget.selected_list == ["13"]
+    # Test the re_cluster text box is empty
+    assert not or_wid_class.add_widget.re_cluster_dict
 
-    # # Add Banana to form
-    # page_session.get_by_label("Fruit").fill("Banana")
-    # select_button.click()
-    # assert widget_class.selected_list == ["Apple", "Banana"]
+    # Add well 94343, index 80
+    page_session.get_by_label("Add Well").fill("94343")
+    page_session.get_by_label("To Project").fill("1")
+    well_add_button = page_session.locator("text=Select wells to manually add")
+    well_add_button.click()
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.add_widget.selected_list == ["94343"]
+    assert or_wid_class.add_widget.re_cluster_dict == {1: [80]}
 
-    # # Unselect recent selection
-    # undo_button = page_session.locator("text=Undo")
-    # undo_button.click()
-    # assert widget_class.selected_list == ["Apple"]
+    # Add the same well twice
+    or_wid_class.add_widget._text = "94343"
+    with pytest.raises(
+        ValueError, match="Choice 94343 already included in list of selections"
+    ):
+        or_wid_class.add_widget._add(None)
 
-    # # TODO: Add more tests
+    # Unselect None
+    or_wid_class.add_widget._text = ""
+    with pytest.raises(ValueError, match="Nothing selected, cannot remove from list"):
+        or_wid_class.add_widget._remove(None)
+
+    # Add well 69254, index 600
+    page_session.get_by_label("Add Well").fill("69254")
+    well_add_button = page_session.locator("text=Select wells to manually add")
+    well_add_button.click()
+    page_session.wait_for_timeout(2000)
+    assert or_wid_class.add_widget.selected_list == ["94343", "69254"]
+    assert or_wid_class.add_widget.re_cluster_dict == {1: [80], 6: [600]}
+
+    # Unselect well 69254
+    or_wid_class.add_widget._remove("69254")
+    assert or_wid_class.add_widget.selected_list == ["94343"]
+    assert or_wid_class.add_widget.re_cluster_dict == {1: [80], 6: []}
+
+    # Lock project 19
+    page_session.wait_for_timeout(2000)
+    page_session.get_by_label("Project").nth(1).fill("19")
+    project_lock_button = page_session.locator("text=Select projects to manually lock")
+    project_lock_button.click()
+    assert or_wid_class.lock_widget.cluster_widget.selected_list == ["19"]
+    assert or_wid_class.lock_widget.cluster_widget._text == "19"
+
+    # Add None to the list
+    or_wid_class.lock_widget._text = ""
+    with pytest.raises(ValueError, match="Nothing selected, cannot add to list"):
+        or_wid_class.lock_widget._add(None)
+
+    # Remove well not in the selected list
+    or_wid_class.lock_widget._text = "69254"
+    with pytest.raises(ValueError, match="Choice 69254 is not in the list"):
+        or_wid_class.lock_widget._remove(None)
+
+    # Test the structure of the override widget return
+    or_selection = or_wid_class.return_value()
+    assert isinstance(or_selection, OverrideSelections)
+    assert isinstance(or_selection.remove_widget_return, WidgetReturn)
+    assert isinstance(or_selection.add_widget_return, AddWidgetReturn)
+    assert isinstance(or_selection.lock_widget_return, WidgetReturn)
+    assert hasattr(or_selection.remove_widget_return, "cluster")
+    assert hasattr(or_selection.remove_widget_return, "well")
+    assert hasattr(or_selection.add_widget_return, "existing_cluster")
+    assert hasattr(or_selection.add_widget_return, "new_cluster")
+    assert hasattr(or_selection.lock_widget_return, "cluster")
+    assert hasattr(or_selection.lock_widget_return, "well")
+
+    assert or_selection.remove_widget_return.cluster == [13]
+    assert or_selection.remove_widget_return.well == {1: [789]}
+    assert or_selection.add_widget_return.existing_cluster == {11: [80]}
+    assert or_selection.add_widget_return.new_cluster == {1: [80], 6: []}
+    assert or_selection.lock_widget_return.cluster == [19]
+    assert or_selection.lock_widget_return.well == {19: [21, 83, 182, 280, 981]}
