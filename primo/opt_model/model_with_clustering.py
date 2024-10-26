@@ -431,9 +431,7 @@ class PluggingCampaignModel(ConcreteModel):
         Parameters
         ----------
         override_dict : tuple
-            A tuple including a dictionary for clusters being fixed:
-            key=> cluster, value => 0 or 1, and a dictionary for a list of
-            wells being fixed in each cluster: key =>cluster, value: list
+            A tuple including a dictionary for clusters being fixed
         """
 
         cluster_fix_dict, well_fix_dict = override_dict

@@ -29,24 +29,23 @@ LOGGER = logging.getLogger(__name__)
 
 class AssessFeasibility:
     """
-    Class for assessing whether the overridden P&A projects adhere to the constraints
+    Class for assessing whether the P&A projects adhere to the constraints
     defined in the optimization problem.
 
     Parameters
     ----------
     opt_inputs : OptModelInputs
-        The optimization model inputs that define the parameters and constraints of the problem.
+        The optimization model inputs.
 
     opt_campaign : Dict
-        A dictionary representing the proposed campaign of projects, including the wells and their
-        associated costs or configurations.
+        A dictionary where keys are cluster numbers and values
+        are list of wells for each cluster in the P&A projects.
 
     wd : WellData
-        An object containing well data used for assessing project feasibility, including
-        well characteristics and historical data.
+        The WellData object for wells being plugged in the P&A projects.
 
     plug_list : List
-        A list of plug types or methods that will be considered in the assessment of the projects.
+        A list of wells to be plugged in the P&A projects.
 
     Attributes
     ----------
@@ -65,7 +64,7 @@ class AssessFeasibility:
 
     def assess_budget(self) -> float:
         """
-        Assesses the impact on budget after user overrides and returns the
+        Assesses whether the budget constraint is violated and returns the
         amount by which the budget is violated. A 0 or negative value indicates
         that we are still under budget
         """
