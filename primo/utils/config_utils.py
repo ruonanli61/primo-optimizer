@@ -16,7 +16,8 @@ import json
 import logging
 import os
 import typing
-from typing import Any, List, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
 
 # Installed libs
 import ipywidgets as widgets
@@ -26,6 +27,8 @@ from IPython.display import clear_output, display
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
+
+# pylint: disable=too-many-lines
 
 
 def read_config(path: str) -> Tuple[bool, dict]:
@@ -45,6 +48,7 @@ def read_config(path: str) -> Tuple[bool, dict]:
         returns tuple with first element as False if config file does
         not exist
     """
+    # pylint: disable=unspecified-encoding
     if not os.path.exists(path):
         return False, {}
 
@@ -547,9 +551,9 @@ class UserPriorities:
 
 class BaseSelectWidget:
     """
-    A base class for displaying an autofill widget in Jupyter Notebook to select multiple choices from a
-    list of choices provided. The widget comes configured with an "Undo" button that exclude the
-    designated well from the selections
+    A base class for displaying an autofill widget in Jupyter Notebook to select multiple
+    choices from a list of choices provided. The widget comes configured with an "Undo"
+    button that exclude the designated well from the selections
 
     Parameters
     ----------
@@ -727,6 +731,7 @@ class SubSelectWidget(BaseSelectWidget):
         Dynamically update the list of well choices available in the drop down widget
         based on the cluster selected
         """
+        # pylint: disable=protected-access
 
         # obtain the current cluster selection
         self._text = data["new"]
@@ -783,6 +788,8 @@ class SelectWidgetAdd(SelectWidget):
         List containing all projects or wells selected by the user
     """
 
+    # pylint: disable=protected-access
+
     def __init__(
         self,
         well_choices: typing.Iterable[str],
@@ -814,6 +821,7 @@ class SelectWidgetAdd(SelectWidget):
     def _update_re_cluster(self, change):
         """Update value show in the re_cluster widget
         based on cluster of the selected well."""
+
         selected_well = change["new"]
         if selected_well:
             cluster_value = self.wd.data.loc[
@@ -845,17 +853,17 @@ class SelectWidgetAdd(SelectWidget):
         """
         # widget_box = widgets.HBox([self.widget, self.re_cluster])
         buttons = widgets.HBox([self.button_add, self.button_remove])
-        Vbox_left = widgets.VBox([self.widget])
-        Vbox_right = widgets.VBox([self.re_cluster, buttons])
-        Vbox_right.layout.align_items = "flex-end"
-        vbox = widgets.HBox([Vbox_left, Vbox_right])
+        vbox_left = widgets.VBox([self.widget])
+        vbox_right = widgets.VBox([self.re_cluster, buttons])
+        vbox_right.layout.align_items = "flex-end"
+        vbox = widgets.HBox([vbox_left, vbox_right])
         return vbox, self.output
 
     def return_selections(self) -> List[int]:
         """
         Return the list of selections made by a user
         """
-        return [item for item in self.selected_list], self.re_cluster_dict
+        return list(self.selected_list), self.re_cluster_dict
 
 
 class UserSelection:
@@ -870,6 +878,8 @@ class UserSelection:
     model_inputs: OptModelInputs
         Object containing the necessary inputs for the optimization model
     """
+
+    # pylint: disable=too-many-instance-attributes,protected-access
 
     def __init__(self, opt_campaign: dict, model_inputs: object):
         self.wd = model_inputs.config.well_data
@@ -901,6 +911,9 @@ class UserSelection:
         self.button_remove_confirm.on_click(self._process_remove_input)
         self.output = widgets.Output()
 
+        self.cluster_lock_choice = []
+        self.well_lock_choice = []
+
     def display(self) -> None:
         """Display the remove_widget"""
         self._display_remove_widget()
@@ -914,7 +927,7 @@ class UserSelection:
         remove_widget_container = widgets.VBox([widget, output])
 
         widget_placeholder = widgets.Label(
-            "Add and lock widgets will display here after clicking Confirm Removal button."
+            "Add and lock widgets will display after clicking Confirm Removal button."
         )
 
         # Combine everything into a container for display
@@ -1017,6 +1030,7 @@ class UserSelection:
         return selections_dict, selections_list
 
     def return_value(self):
+        """A wrapper for returning selections of all widgets"""
         well_removed_dict, well_removed_list = self._return_well_index_cluster(
             self.remove_widget.return_selections()
         )
@@ -1043,55 +1057,60 @@ class UserSelection:
         lock_widget_return = WidgetReturn(cluster_lock_list, well_lock_dict)
 
         return OverrideSelections(
-            remove_widget_return, add_widget_return, lock_widget_return
+            remove_widget_return=remove_widget_return,
+            add_widget_return=add_widget_return,
+            lock_widget_return=lock_widget_return,
         )
 
 
+@dataclass
 class WidgetReturn:
     """
     Class for storing the widget return
 
     Parameters
     ----------
-    cluster : list
+    cluster : List
         List of projects that are removed or locked
 
-    well_dict : dict
+    well : Dict
         Dictionary of list of wells that are removed or locked in a cluster
     """
 
-    def __init__(self, cluster, well_dict):
-
-        self.cluster = cluster
-        self.well = well_dict
+    cluster: List[int]
+    well: Dict[int, List[int]]
 
     def __str__(self):
         return f"WidgetReturn(project={self.cluster}, " f"well_dict={self.well})"
 
 
+@dataclass
 class AddWidgetReturn:
     """
     Class for storing the add widget return
 
     Parameters
     ----------
-    existing_cluster_dict : list
+    existing_cluster : Dict
         Dictionary of list of wells being added and their original cluster;
         key=> cluster, value=> well list
 
-    new_cluster_dict : dict
+    new_cluster : Dict
         Dictionary of list of wells being added and their new cluster;
         key=> cluster, value=> well list
     """
 
-    def __init__(self, existing_cluster_dict, new_cluster_dict):
-        self.existing_cluster = existing_cluster_dict
-        self.new_cluster = new_cluster_dict
+    existing_cluster: Dict[int, List[int]]
+    new_cluster: Dict[int, List[int]]
 
     def __str__(self):
-        return f"AddWidgetReturn(existing_cluster_dict={self.well_dict}, new_cluster_dict={self.additional_info})"
+        return (
+            f"AddWidgetReturn(existing_cluster_dict={self.existing_cluster}, "
+            f"new_cluster_dict={self.new_cluster})"
+        )
 
 
+@dataclass
 class OverrideSelections:
     """
     Class for storing the return from the remove_widget, add_widget, and lock_widget
@@ -1108,10 +1127,9 @@ class OverrideSelections:
         Object returned by the lock_widget
     """
 
-    def __init__(self, remove_widget_return, add_widget_return, lock_widget_return):
-        self.remove_widget_return = remove_widget_return
-        self.add_widget_return = add_widget_return
-        self.lock_widget_return = lock_widget_return
+    remove_widget_return: WidgetReturn
+    add_widget_return: AddWidgetReturn
+    lock_widget_return: WidgetReturn
 
     def __str__(self):
         return (

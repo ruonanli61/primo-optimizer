@@ -22,6 +22,9 @@ import pytest
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics, WellData
 from primo.opt_model.model_options import OptModelInputs
+from primo.opt_model.tests.test_model_options import (  # pylint: disable=unused-import
+    get_column_names_fixture,
+)
 from primo.utils.config_utils import (
     AddWidgetReturn,
     OverrideSelections,

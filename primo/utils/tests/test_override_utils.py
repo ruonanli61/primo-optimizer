@@ -111,6 +111,15 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
     assert np.isclose(project.impact_score, 68.88, rtol=1e-2, atol=1e-2)
     assert np.isclose(project.efficiency_score, 32.485, rtol=1e-2, atol=1e-2)
 
+    override_campaign_dict = or_camp_class.recalculate_scores()
+    assert isinstance(override_campaign_dict, dict)
+    assert 13 not in override_campaign_dict
+    assert all(
+        [63.55375464985779, 46.03383590762232][i]
+        == pytest.approx(override_campaign_dict[11][i])
+        for i in range(2)
+    )
+
     override_cluster_dict, override_well_dict = or_camp_class.re_optimize_dict()
     assert override_cluster_dict == {13: 0, 19: 1}
     assert override_well_dict == {

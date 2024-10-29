@@ -300,13 +300,25 @@ class OverrideCampaign:
 
     def recalculate(self):
         """
-        Construct the new Campaign object based on the override selection
+        Recalculate the efficiency scores and impact scores of the new campaign
+        based on the override selection
         """
         logging.disable(logging.CRITICAL)
         override_campaign = self.override_campaign()
         override_campaign.set_efficiency_weights(self.eff_metrics)
         override_campaign.compute_efficiency_scores()
         return override_campaign
+
+    def recalculate_scores(self):
+        """
+        A function to return the impact score and efficiency score of
+        the new campaign based on the override selection
+        """
+        override_campaign = self.recalculate()
+        return {
+            project_id: [project.impact_score, project.efficiency_score]
+            for project_id, project in override_campaign.projects.items()
+        }
 
     def re_optimize_dict(self):
         """
