@@ -62,6 +62,11 @@ class AssessFeasibility:
         self.plug_list = plug_list
         self.campaign_cost_dict = {}
 
+        for cluster, groups in self.new_campaign.items():
+            n_wells = len(groups)
+            campaign_cost = self.opt_inputs.get_mobilization_cost[n_wells]
+            self.campaign_cost_dict[cluster] = campaign_cost
+
     def assess_budget(self) -> float:
         """
         Assesses whether the budget constraint is violated and returns the
@@ -69,13 +74,12 @@ class AssessFeasibility:
         that we are still under budget
         """
         total_cost = 0
-        for cluster, groups in self.new_campaign.items():
-            n_wells = len(groups)
-            campaign_cost = self.opt_inputs.get_mobilization_cost[n_wells]
-            self.campaign_cost_dict[cluster] = campaign_cost
-            total_cost += campaign_cost
 
-        return (total_cost - self.opt_inputs.get_total_budget) * 1e6
+        total_cost = sum(
+            project_cost for _, project_cost in self.campaign_cost_dict.items()
+        )
+
+        return round((total_cost - self.opt_inputs.get_total_budget) * 1e6)
 
     def assess_dac(self) -> float:
         """
