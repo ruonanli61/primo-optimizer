@@ -836,12 +836,12 @@ class WellData:
                 self._removed_rows["unknown_owner"] = unknown_owner
 
         # Check if age data is available, and calculate it if it is missing
-        LOGGER.info("Checking if age of all wells is available.")
-        self._check_age_depth_availability(column="age")
+        # LOGGER.info("Checking if age of all wells is available.")
+        # self._check_age_depth_availability(column="age")
 
         # Check if depth data is available, and calculate it if it is missing
-        LOGGER.info("Checking if depth of all wells is available.")
-        self._check_age_depth_availability(column="depth")
+        # LOGGER.info("Checking if depth of all wells is available.")
+        # self._check_age_depth_availability(column="depth")
 
         # Filter wells based on production volume
         if (
@@ -859,8 +859,8 @@ class WellData:
         # Assuming that no well is deeper than 40000 ft
         self.check_data_in_range(wcn.latitude, -90, 90)
         self.check_data_in_range(wcn.longitude, -90, 90)
-        self.check_data_in_range(wcn.age, 0.0, 350.0)
-        self.check_data_in_range(wcn.depth, 0.0, 40000.0)
+        # self.check_data_in_range(wcn.age, 0.0, 350.0)
+        # self.check_data_in_range(wcn.depth, 0.0, 40000.0)
 
         LOGGER.info("Completed processing the essential inputs.")
 
@@ -897,6 +897,7 @@ class WellData:
                 "well_count",
                 "num_wells",
                 "num_unique_owners",
+                "proximity",
             ):
                 # these have their own processing functions (or none at all)
                 continue

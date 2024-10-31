@@ -33,8 +33,8 @@ class WellDataColumnNames:  # pylint: disable=too-many-instance-attributes
     well_id: str
     latitude: str
     longitude: str
-    age: str
-    depth: str
+    age: Optional[str] = None
+    depth: Optional[str] = None
     operator_name: Optional[str] = None
 
     # Columns for ch4_emissions metric

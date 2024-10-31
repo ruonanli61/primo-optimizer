@@ -69,10 +69,16 @@ def add_county_names_to_map(
     for county in state_shapefile.itertuples():
         # TODO: Need to a more general method for taking the county name when the column is called with names
         # different from "NAME" and "COUNTY_NAME".
-        try:
-            county_name = county.NAME  # First case
-        except AttributeError:
-            county_name = county.COUNTY_NAM  # Second case
+        county_name = (
+            getattr(county, "NAME", None)
+            or getattr(county, "County_Nam", None)
+            or getattr(county, "COUNTY_NAM", None)
+        )
+
+        # Optionally, handle the case where none of the attributes are found
+        if county_name is None:
+            raise AttributeError("None of the county name attributes are found.")
+
         # Project county to a flat project before taking centroid
         centroid = [county.geometry.centroid.y, county.geometry.centroid.x]
         folium.map.Marker(
@@ -257,47 +263,47 @@ def add_well_markers_to_map(
     if well_type_to_plot not in ("Oil", "Gas") and well_type_to_plot is not None:
         raise_exception(f"Unknown well type: {well_type_to_plot}", ValueError)
 
-    well_type_column_index = gdf.columns.get_loc("Well Type") + 1
-    age_column_index = gdf.columns.get_loc("Age [Years]") + 1
-    depth_column_index = gdf.columns.get_loc("Depth [ft]") + 1
-    try:
-        well_id_index = gdf.columns.get_loc("API Well Number") + 1
-    except KeyError:
-        well_id_index = gdf.columns.get_loc("API") + 1
+    # well_type_column_index = gdf.columns.get_loc("Well Type") + 1
+    # age_column_index = gdf.columns.get_loc("Age [Years]") + 1
+    # depth_column_index = gdf.columns.get_loc("Depth [ft]") + 1
+    # try:
+    #     well_id_index = gdf.columns.get_loc("API Well Number") + 1
+    # except KeyError:
+    #     well_id_index = gdf.columns.get_loc("API") + 1
 
     total_score_index = None  # Set default value to None
 
-    if "Priority Score [0-100]" in gdf.columns:
-        total_score_index = gdf.columns.get_loc("Priority Score [0-100]") + 1
+    # if "Priority Score [0-100]" in gdf.columns:
+    #     total_score_index = gdf.columns.get_loc("Priority Score [0-100]") + 1
     for row in gdf.itertuples():
-        if row.geometry.is_empty:
-            continue
+        #     if row.geometry.is_empty:
+        #     continue
 
-        well_id = row[well_id_index]
-        age = row[age_column_index]
-        depth = row[depth_column_index]
-        well_type = row[well_type_column_index]
+        # well_id = row[well_id_index]
+        # age = row[age_column_index]
+        # depth = row[depth_column_index]
+        # well_type = row[well_type_column_index]
 
-        if well_type_to_plot is not None and well_type != well_type_to_plot:
-            # Skip the well type as it is not required to be plotted
-            continue
+        # if well_type_to_plot is not None and well_type != well_type_to_plot:
+        #     # Skip the well type as it is not required to be plotted
+        #     continue
 
-        if total_score_index is not None:
-            total_score = round(row[total_score_index], 2)
-            popup_text = f"API: {well_id}<br>Age: {age}<br>Depth: {depth}<br>Well Type: {well_type}<br>Impact score: {total_score}"
-        else:
-            popup_text = f"API: {well_id}<br>Age: {age}<br>Depth: {depth}<br>Well Type: {well_type}"
+        # if total_score_index is not None:
+        #     total_score = round(row[total_score_index], 2)
+        #     popup_text = f"API: {well_id}<br>Age: {age}<br>Depth: {depth}<br>Well Type: {well_type}<br>Impact score: {total_score}"
+        # else:
+        #     popup_text = f"API: {well_id}<br>Age: {age}<br>Depth: {depth}<br>Well Type: {well_type}"
 
-        if well_type == "Gas":
+        if well_type_to_plot == "Gas":
             icon = folium.CircleMarker(
                 location=[row.geometry.y, row.geometry.x],
                 radius=5,
-                popup=popup_text,
+                # popup=popup_text,
                 fill=True,
                 color="red",
             )
             icon.add_to(map_obj)
-        elif well_type == "Oil":
+        elif well_type_to_plot == "Oil":
             icon_cross = BeautifyIcon(
                 icon="times",
                 inner_icon_style="color:blue;font-size:18px;",  # Adjust size here
@@ -306,12 +312,19 @@ def add_well_markers_to_map(
             )
             icon = folium.Marker(
                 location=[row.geometry.y, row.geometry.x],
-                popup=popup_text,
+                # popup=popup_text,
                 icon=icon_cross,
             )
             icon.add_to(map_obj)
         else:
-            continue  # Skip points with other well types
+            icon = folium.CircleMarker(
+                location=[row.geometry.y, row.geometry.x],
+                radius=5,
+                # popup=popup_text,
+                fill=True,
+                color="red",
+            )
+            icon.add_to(map_obj)  # Skip points with other well types
 
 
 def visualize_data(
@@ -428,24 +441,24 @@ def add_cluster_markers_to_map(
     None
     """
 
-    age_index = full_data_points.columns.get_loc("Age [Years]") + 1
-    depth_index = full_data_points.columns.get_loc("Depth [ft]") + 1
-    try:
-        well_id_index = full_data_points.columns.get_loc("API Well Number") + 1
-    except KeyError:
-        well_id_index = full_data_points.columns.get_loc("API") + 1
+    # age_index = full_data_points.columns.get_loc("Age [Years]") + 1
+    # depth_index = full_data_points.columns.get_loc("Depth [ft]") + 1
+    # try:
+    #     well_id_index = full_data_points.columns.get_loc("API Well Number") + 1
+    # except KeyError:
+    #     well_id_index = full_data_points.columns.get_loc("API") + 1
     for row in full_data_points.itertuples():
-        if pd.isna(row.cluster):
-            continue
+        # if pd.isna(row.cluster):
+        #     continue
         latitude = row.geometry.y
         longitude = row.geometry.x
-        age = row[age_index]
-        depth = row[depth_index]
-        well_id = row[well_id_index]
-        popup_text = (
-            f"Project: {row.cluster}<br>Well ID: {well_id}<br>Latitude: {latitude}"
-            f"<br>Longitude: {longitude}<br>Depth: {depth}<br>Age: {age}"
-        )
+        # age = row[age_index]
+        # depth = row[depth_index]
+        # well_id = row[well_id_index]
+        # popup_text = (
+        #     f"Project: {row.cluster}<br>Well ID: {well_id}<br>Latitude: {latitude}"
+        #     f"<br>Longitude: {longitude}<br>Depth: {depth}<br>Age: {age}"
+        # )
         color = cluster_colors.get(
             row.cluster, "gray"
         )  # Use 'gray' if cluster not in color scheme
@@ -453,7 +466,7 @@ def add_cluster_markers_to_map(
         folium.CircleMarker(
             location=[latitude, longitude],
             radius=8,
-            popup=popup_text,
+            # popup=popup_text,
             fill=True,
             color=color,
         ).add_to(map_obj)
@@ -488,7 +501,7 @@ def visualize_data_with_clusters(
         zoom_start=8.2,
     )
     common_visualization(map_obj, state_shapefile)
-    cluster_list = pd.unique(full_data["cluster"])
+    cluster_list = pd.unique(full_data["Clusters"])
     cluster_colors = get_cluster_colors(num_cluster, cluster_list)
     add_cluster_markers_to_map(full_data_points, map_obj, cluster_colors)
     return map_obj
@@ -513,27 +526,27 @@ def add_project_markers_to_map(
     -------
     None
     """
-    gas_index = selected.columns.get_loc("Gas [Mcf/Year]") + 1
-    oil_index = selected.columns.get_loc("Oil [bbl/Year]") + 1
-    score_index = selected.columns.get_loc("Priority Score [0-100]") + 1
+    # gas_index = selected.columns.get_loc("Gas [Mcf/Year]") + 1
+    # oil_index = selected.columns.get_loc("Oil [bbl/Year]") + 1
+    # score_index = selected.columns.get_loc("Priority Score [0-100]") + 1
     for row in selected.itertuples():
-        if pd.isna(row.Project):
-            continue
-        gas = row[gas_index]
-        oil = row[oil_index]
-        cluster = "Project: " + str(row.Project)
-        score = row[score_index]
-        popup_text = (
-            f"Oil [bbl/day]: {oil}<br>Gas [Mcf/day]: {gas}<br>"
-            f"Candidate Project: {cluster}<br>Score: {score}<br>"
-        )
+        # if pd.isna(row.Project):
+        #     continue
+        # gas = row[gas_index]
+        # oil = row[oil_index]
+        # cluster = "Project: " + str(row.Project)
+        # score = row[score_index]
+        # popup_text = (
+        #     f"Oil [bbl/day]: {oil}<br>Gas [Mcf/day]: {gas}<br>"
+        #     f"Candidate Project: {cluster}<br>Score: {score}<br>"
+        # )
         color = cluster_colors.get(
             row.Project, "gray"
         )  # Use 'gray' if cluster not in color scheme
         folium.CircleMarker(
             location=[row.Latitude, row.Longitude],
             radius=5,
-            popup=popup_text,
+            # popup=popup_text,
             fill=True,
             color=color,
         ).add_to(map_obj)

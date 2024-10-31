@@ -340,11 +340,4 @@ SUPP_EFF_METRICS = {
         has_inverse_priority=True,
         fill_missing_value={"domain": NonNegativeFloat, "default": 0},
     ),
-    "proximity": _SupportedContent(
-        name="proximity",
-        full_name="Well proximity [miles]",
-        required_data="latitude", "longitude"
-        has_inverse_priority=True,
-        fill_missing_value={"domain": NonNegativeFloat, "default": 0},
-    ),
 }

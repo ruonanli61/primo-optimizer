@@ -202,8 +202,8 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         # Step 3: Construct pairwise-metrics between wells in each cluster.
         # Structure: {cluster: {(index_1, index_2): distance_12, ...}...}
         self.pairwise_distance = self._pairwise_matrix(metric="distance")
-        self.pairwise_age_difference = self._pairwise_matrix(metric="age")
-        self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
+        # self.pairwise_age_difference = self._pairwise_matrix(metric="age")
+        # self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
 
         # Construct owner well count data
         operator_list = set(wd[col_names.operator_name])
