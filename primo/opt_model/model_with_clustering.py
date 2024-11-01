@@ -313,10 +313,13 @@ class PluggingCampaignModel(ConcreteModel):
         model_inputs : OptModelInputs
             Object containing the necessary inputs for the optimization model
 
-        override_dict : tuple
-            A tuple including a dictionary for clusters being fixed:
-            key=> cluster, value => 0 or 1, and a dictionary for a list of
-            wells being fixed in each cluster: key =>cluster, value: list
+        override_dict : tuple(Dict[int,int], Dict[int, List[Dict[int,int]]])
+            A tuple containing two dictionaries:
+                - A dictionary mapping clusters (key) to binary values (0 or 1) indicating
+                the cluster is fixed.
+                - A dictionary mapping clusters (key) to a list of dictionaries, where
+                each dictionary contains wells (key) and their associated binary values
+                (0 or 1) indicating the well is fixed within the respective cluster.
         """
         super().__init__(*args, **kwargs)
 
@@ -424,31 +427,48 @@ class PluggingCampaignModel(ConcreteModel):
 
     def fix_var(self, override_dict):
         """
-        Fixes the binary variables associated with the cluster
-        and/or the wells with in the cluster based on the override
-        selection
+        identify clusters and/or the wells with in the cluster that will be fixed
+        based on the override selection
 
         Parameters
         ----------
-        override_dict : tuple
-            A tuple including a dictionary for clusters being fixed
+        override_dict : tuple(Dict[int,int], Dict[int, List[Dict[int,int]]])
+            A tuple containing two dictionaries:
+                - cluster_fix_dict : A dictionary mapping clusters (key) to binary values
+                (0 or 1) indicating the cluster is fixed. Contains information on cluster
+                selected to be locked
+                - well_fix_dict : A dictionary mapping clusters (key) to a list of dictionaries,
+                 where each dictionary contains wells (key) and their associated binary values
+                (0 or 1) indicating the well is fixed within the respective cluster.
         """
 
+        # obtain the dictionary for clusters being fixed and wells being fixed
         cluster_fix_dict, well_fix_dict = override_dict
 
-        # Combine clusters and remove duplicates using a set
+        # Combine keys (cluster) of cluster_fix_dict and well_fix_dict and remove
+        # duplicates using a set
         unique_clusters = set(cluster_fix_dict.keys()).union(set(well_fix_dict.keys()))
         unique_clusters_list = list(unique_clusters)
 
+        # Obtain information on whether a cluster is fixed and if any wells in the cluster
+        # are fixed.
+        # The fix() method applies the fixes to the cluster and wells independently.
+        # Iterate over all clusters in the unique_clusters_list
         for c in unique_clusters_list:
+            # Get the binary variable for the cluster selected to be fixed. If only
+            # specific wells in the cluster are fixed, assign None to the cluster.
             if c in cluster_fix_dict:
                 cluster_v = cluster_fix_dict[c]
             else:
                 cluster_v = None
+
+            # Get the binary variable for the wells selected to be fixed. For a fixed cluster,
+            # if no specific wells are selected, assign None to the wells.
             if c in well_fix_dict:
                 wells_v = well_fix_dict[c]
             else:
                 wells_v = None
+
             self.cluster[c].fix(cluster_v, wells_v)
 
     def add_min_budget_usage(self):

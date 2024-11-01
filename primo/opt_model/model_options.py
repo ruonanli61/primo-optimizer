@@ -329,18 +329,16 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ---------
-        add_widget_return : AddWidgetReturn
-            An AdWidgetReturn object which includes information on wells selected to add
+        add_widget_return : OverrideAddInfo
+            An OverrideAddInfo object which includes information on wells selected to add
             to the existing optimal P&A projects
         """
-        existing_clusters = add_widget_return.existing_cluster
-        new_clusters = add_widget_return.new_cluster
+        existing_clusters = add_widget_return.existing_clusters
+        new_clusters = add_widget_return.new_clusters
         wd = self.config.well_data
         col_names = wd.col_names
 
-        if existing_clusters == new_clusters:
-            pass
-        else:
+        if existing_clusters != new_clusters:
             # Remove wells from existing clusters and update owner well counts
             for existing_cluster, existing_wells in existing_clusters.items():
                 for well in existing_wells:
@@ -353,9 +351,9 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             for new_cluster, wells in new_clusters.items():
                 for well in wells:
                     self.campaign_candidates[new_cluster].append(well)
-                    self.config.well_data.data.loc[well, col_names.cluster] = (
-                        new_cluster
-                    )
+                    self.config.well_data.data.loc[
+                        well, col_names.cluster
+                    ] = new_cluster
                     self.owner_well_count[
                         wd.data.loc[well, col_names.operator_name]
                     ].append((new_cluster, well))
