@@ -23,18 +23,24 @@ from primo.opt_model.result_parser import Campaign
 from primo.opt_model.tests.test_model_options import (  # pylint: disable=unused-import
     get_column_names_fixture,
 )
-from primo.utils.config_utils import AddWidgetReturn, OverrideSelections, WidgetReturn
+from primo.utils.config_utils import (
+    OverrideAddInfo,
+    OverrideRemoveLockInfo,
+    OverrideSelections,
+)
 from primo.utils.override_utils import AssessFeasibility, OverrideCampaign
 from primo.utils.tests.test_config_utils import (  # pylint: disable=unused-import
     efficiency_metrics_fixture,
     get_model_fixture,
 )
 
-# pylint: disable=missing-function-docstring
-
 
 @pytest.fixture(name="or_infeasible_selection")
 def or_infeasible_selection_fixture():
+    """
+    Pytest fixture for constructing an override selection return which
+    will lead to infeasible P&A projects.
+    """
     project_remove = [13]
     well_remove = {1: [851, 858]}
     well_add_existing_cluster = {
@@ -47,9 +53,9 @@ def or_infeasible_selection_fixture():
     well_add_new_cluster = {11: [851, 80], 6: [600], 10: [734], 40: [601]}
     project_lock = [19]
     well_lock = {19: [21, 83, 182, 280, 981]}
-    remove_widget_return = WidgetReturn(project_remove, well_remove)
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
-    lock_widget_return = WidgetReturn(project_lock, well_lock)
+    remove_widget_return = OverrideRemoveLockInfo(project_remove, well_remove)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
+    lock_widget_return = OverrideRemoveLockInfo(project_lock, well_lock)
     or_selection = OverrideSelections(
         remove_widget_return, add_widget_return, lock_widget_return
     )
@@ -68,9 +74,9 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
         or_selection, opt_mdl_inputs, opt_campaign.clusters_dict, eff_metrics
     )
 
-    assert isinstance(or_camp_class.remove, WidgetReturn)
-    assert isinstance(or_camp_class.add, AddWidgetReturn)
-    assert isinstance(or_camp_class.lock, WidgetReturn)
+    assert isinstance(or_camp_class.remove, OverrideRemoveLockInfo)
+    assert isinstance(or_camp_class.add, OverrideAddInfo)
+    assert isinstance(or_camp_class.lock, OverrideRemoveLockInfo)
     assert isinstance(or_camp_class.opt_inputs, OptModelInputs)
     assert or_camp_class.eff_metrics == eff_metrics
     assert isinstance(or_camp_class.eff_metrics, EfficiencyMetrics)
@@ -121,7 +127,7 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
     )
 
     override_cluster_dict, override_well_dict = or_camp_class.re_optimize_dict()
-    assert override_cluster_dict == {13: 0, 19: 1}
+    assert override_cluster_dict == {19: 1}
     assert override_well_dict == {
         1: {851: 0, 858: 0},
         11: {851: 1, 80: 1},
@@ -134,15 +140,19 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
 
 @pytest.fixture(name="or_feasible_selection")
 def or_feasible_selection_fixture():
+    """
+    Pytest fixture for constructing an override selection return which
+    will lead to feasible P&A projects.
+    """
     project_remove = [13]
     well_remove = {}
     well_add_existing_cluster = {}
     well_add_new_cluster = {}
     project_lock = []
     well_lock = {}
-    remove_widget_return = WidgetReturn(project_remove, well_remove)
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
-    lock_widget_return = WidgetReturn(project_lock, well_lock)
+    remove_widget_return = OverrideRemoveLockInfo(project_remove, well_remove)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
+    lock_widget_return = OverrideRemoveLockInfo(project_lock, well_lock)
     or_selection = OverrideSelections(
         remove_widget_return, add_widget_return, lock_widget_return
     )
@@ -209,15 +219,19 @@ def test_infeasible_dac(or_feasible_selection, get_model):
 
 @pytest.fixture(name="or_infeasible_owc_selection")
 def or_infeasible_owc_selection_fixture():
+    """
+    Pytest fixture for constructing an override selection return that
+    results in new P&A projects violating the owner well count constraint.
+    """
     project_remove = [13]
     well_remove = {}
     well_add_existing_cluster = {19: [86]}
     well_add_new_cluster = {19: [86]}
     project_lock = []
     well_lock = {}
-    remove_widget_return = WidgetReturn(project_remove, well_remove)
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
-    lock_widget_return = WidgetReturn(project_lock, well_lock)
+    remove_widget_return = OverrideRemoveLockInfo(project_remove, well_remove)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
+    lock_widget_return = OverrideRemoveLockInfo(project_lock, well_lock)
     or_selection = OverrideSelections(
         remove_widget_return, add_widget_return, lock_widget_return
     )
@@ -226,8 +240,8 @@ def or_infeasible_owc_selection_fixture():
 
 def test_infeasible_owc(or_infeasible_owc_selection, get_model):
     """
-    Test the override campaign class when the DAC for the
-    new project is infeasible after the override step
+    Test the override campaign class where the new projects violate
+    the owner well count constraint after the override step
     """
     opt_campaign, opt_mdl_inputs, eff_metrics = get_model
     or_selection = or_infeasible_owc_selection
@@ -258,15 +272,19 @@ def test_infeasible_owc(or_infeasible_owc_selection, get_model):
 
 @pytest.fixture(name="or_feasible_distance_selection")
 def or_infeasible_distance_selection_fixture():
+    """
+    Pytest fixture for constructing an override selection return that
+    results in new P&A projects violating the distance constraint.
+    """
     project_remove = [13]
     well_remove = {1: [851]}
     well_add_existing_cluster = {1: [851]}
     well_add_new_cluster = {11: [851]}
     project_lock = []
     well_lock = {}
-    remove_widget_return = WidgetReturn(project_remove, well_remove)
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
-    lock_widget_return = WidgetReturn(project_lock, well_lock)
+    remove_widget_return = OverrideRemoveLockInfo(project_remove, well_remove)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
+    lock_widget_return = OverrideRemoveLockInfo(project_lock, well_lock)
     or_selection = OverrideSelections(
         remove_widget_return, add_widget_return, lock_widget_return
     )
@@ -275,8 +293,8 @@ def or_infeasible_distance_selection_fixture():
 
 def test_infeasible_distance(or_feasible_distance_selection, get_model):
     """
-    Test the override campaign class when the DAC for the
-    new project is infeasible after the override step
+    Test the override campaign class where the new projects violate
+    the distance constraint after the override step
     """
     opt_campaign, opt_mdl_inputs, eff_metrics = get_model
     or_selection = or_feasible_distance_selection

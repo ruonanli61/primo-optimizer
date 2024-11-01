@@ -29,16 +29,20 @@ from primo.opt_model.model_with_clustering import (  # pylint: disable=no-name-i
     PluggingCampaignModel,
 )
 from primo.opt_model.result_parser import Campaign, Project
-from primo.utils.config_utils import AddWidgetReturn
+from primo.utils.config_utils import OverrideAddInfo
 
 LOGGER = logging.getLogger(__name__)
 
-# pylint: disable=missing-function-docstring
+
 # pylint: disable=duplicate-code
 
 
 @pytest.fixture(name="get_column_names", scope="function")
 def get_column_names_fixture():
+    """
+    Pytest fixture to set up the impact metric, assign
+    column names, and read the test data.
+    """
 
     # Define impact metrics by creating an instance of ImpactMetrics class
     im_metrics = ImpactMetrics()
@@ -98,6 +102,9 @@ def get_column_names_fixture():
 
 
 def test_opt_model_inputs(get_column_names):
+    """
+    Test that the optimization model is constructed and solved correctly.
+    """
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
 
@@ -295,6 +302,9 @@ def test_opt_model_inputs(get_column_names):
 
 
 def test_incremental_formulation(get_column_names):
+    """
+    Test that the incremental formulation of the optimization model.
+    """
     im_metrics, col_names, filename = get_column_names
 
     # Create the well data object
@@ -354,6 +364,9 @@ def test_incremental_formulation(get_column_names):
 
 
 def test_unused_budget_variable_scaling(get_column_names):
+    """
+    Test the optimization model when there is enough budget for plugging all wells.
+    """
     im_metrics, col_names, filename = get_column_names
 
     # Create the well data object
@@ -395,6 +408,10 @@ def test_unused_budget_variable_scaling(get_column_names):
 
 # pylint: disable=too-many-locals
 def test_override_re_optimization(get_column_names):
+    """
+    Test that the optimization model is constructed and solved correctly
+    when an override choice is made.
+    """
     im_metrics, col_names, filename = get_column_names
 
     # Create the well data object
@@ -440,7 +457,7 @@ def test_override_re_optimization(get_column_names):
     }
     well_add_new_cluster = {11: [80], 6: [600], 10: [734], 40: [601]}
 
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
     initial_opt_mdl_inputs = copy.deepcopy(opt_mdl_inputs)
 
     opt_mdl_inputs.build_optimization_model()
@@ -488,6 +505,10 @@ def test_override_re_optimization(get_column_names):
 
 # pylint: disable=too-many-locals
 def test_re_cluster(get_column_names):
+    """
+    Test the re_cluster function to ensure that the optimization model
+    inputs are accurately updated based on the override choice.
+    """
     im_metrics, col_names, filename = get_column_names
 
     # Create the well data object
@@ -521,7 +542,7 @@ def test_re_cluster(get_column_names):
     }
     well_add_new_cluster = {11: [80], 6: [600], 10: [981], 40: [601]}
 
-    add_widget_return = AddWidgetReturn(well_add_existing_cluster, well_add_new_cluster)
+    add_widget_return = OverrideAddInfo(well_add_existing_cluster, well_add_new_cluster)
 
     opt_mdl_inputs.build_optimization_model()
     opt_campaign = opt_mdl_inputs.solve_model(solver="highs")

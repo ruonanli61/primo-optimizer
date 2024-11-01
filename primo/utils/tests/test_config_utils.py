@@ -26,12 +26,12 @@ from primo.opt_model.tests.test_model_options import (  # pylint: disable=unused
     get_column_names_fixture,
 )
 from primo.utils.config_utils import (
-    AddWidgetReturn,
+    OverrideAddInfo,
+    OverrideRemoveLockInfo,
     OverrideSelections,
     SelectWidgetAdd,
     SubSelectWidget,
     UserSelection,
-    WidgetReturn,
     _get_checkbox_params,
     copy_dict,
     copy_values,
@@ -40,8 +40,6 @@ from primo.utils.config_utils import (
     read_defaults,
     update_defaults,
 )
-
-# pylint: disable=missing-function-docstring
 
 
 @pytest.mark.parametrize(
@@ -91,6 +89,10 @@ from primo.utils.config_utils import (
     ],
 )
 def test_copy_dict(input_dict, output_dict, result, status_ok):
+    """
+    Test the copy_dict function for copying the non-default user-provided options
+    to the output_dict.
+    """
     if status_ok:
         assert copy_dict(input_dict, output_dict) == result
     else:
@@ -154,6 +156,9 @@ def test_copy_dict(input_dict, output_dict, result, status_ok):
     ],
 )
 def test_is_valid(input_dict, reference_dict, result):
+    """
+    Test the is_valid function for validating the input config.
+    """
     assert is_valid(input_dict, reference_dict) == result
 
 
@@ -165,6 +170,10 @@ def test_is_valid(input_dict, reference_dict, result):
     ],
 )
 def test_read_config(monkeypatch, path, expected_result):
+    """
+    Test the read_config function for reading a config file.
+    """
+
     # pylint: disable=unused-argument
     def mock_exists(p):
         return p == "valid_config.json"
@@ -172,9 +181,13 @@ def test_read_config(monkeypatch, path, expected_result):
     def mock_open(p, _):
         class MockFile:
             """
-            A mock implementation of a file object for testing purposes."""
+            A mock implementation of a file object for testing purposes.
+            """
 
             def read(self):
+                """
+                read the config file.
+                """
                 return '{"key": "value"}'
 
             def __enter__(self):
@@ -209,6 +222,10 @@ def test_read_config(monkeypatch, path, expected_result):
     ],
 )
 def test_update_defaults(config_dict, input_dict, expected_result):
+    """
+    Test the update_defaults function to verify that the default value in
+    input_dict is correctly updated based on the config_dict.
+    """
     assert update_defaults(config_dict, input_dict) == expected_result
 
 
@@ -228,6 +245,10 @@ def test_update_defaults(config_dict, input_dict, expected_result):
     ],
 )
 def test_read_defaults(input_dict, expected_priority, expected_sub_priority):
+    """
+    Test the read_defaults function to verify if the input dictionaries with
+    default initial values are created.
+    """
     assert read_defaults(input_dict) == (expected_priority, expected_sub_priority)
 
 
@@ -249,6 +270,10 @@ def test_read_defaults(input_dict, expected_priority, expected_sub_priority):
     ],
 )
 def test_copy_values(input_dict, output_dict, key, expected_result):
+    """
+    Test the copy_dict function to verify that the dictionary associated with the specified
+    `key` in `input_dict` is correctly copied to `output_key`.
+    """
     assert copy_values(input_dict, output_dict, key) == expected_result
 
 
@@ -266,11 +291,18 @@ def test_copy_values(input_dict, output_dict, key, expected_result):
     ],
 )
 def test_get_checkbox_params(param_dict, expected_result):
+    """
+    Test the _get_checkbox_params function to verify if the parameters
+    in the param_dict are accurately return.
+    """
     assert _get_checkbox_params(param_dict) == expected_result
 
 
 @pytest.fixture(name="eff_metric")
 def efficiency_metrics_fixture():
+    """
+    Pytest fixture for constructing efficiency metrics.
+    """
     eff_metrics = EfficiencyMetrics()
     eff_metrics.set_weight(
         primary_metrics={
@@ -286,6 +318,10 @@ def efficiency_metrics_fixture():
 
 @pytest.fixture(name="get_model")
 def get_model_fixture(get_column_names, eff_metric):
+    """
+    Pytest fixture for constructing an optimization model and obtain
+    the optimization results.
+    """
     im_metrics, col_names, filename = get_column_names
     eff_metrics = eff_metric
 
@@ -324,8 +360,13 @@ def get_model_fixture(get_column_names, eff_metric):
 
 
 @pytest.mark.widgets
-def test_user_selection(page_session: playwright.sync_api.Page, get_model):
+def test_user_selection(
+    solara_test, page_session: playwright.sync_api.Page, get_model
+):  # pylint: disable=unused-argument
     # pylint: disable=protected-access, too-many-statements
+    """
+    Test the override widget
+    """
     opt_campaign, opt_mdl_inputs, _ = get_model
 
     or_wid_class = UserSelection(opt_campaign.clusters_dict, opt_mdl_inputs)
@@ -407,10 +448,6 @@ def test_user_selection(page_session: playwright.sync_api.Page, get_model):
     page_session.wait_for_timeout(2000)
     assert or_wid_class.remove_widget.selected_list == ["48446"]
 
-    # Test the confirm removal button
-    assert not hasattr(or_wid_class, "cluster_lock_choice")
-    assert not hasattr(or_wid_class, "well_lock_choice")
-
     or_wid_class.button_remove_confirm.click()
 
     # Test the re_cluster text box is empty
@@ -434,6 +471,7 @@ def test_user_selection(page_session: playwright.sync_api.Page, get_model):
 
     # Withdraw None
     or_wid_class.add_widget._text = ""
+    page_session.get_by_label("Add Well").fill("")
     with pytest.raises(ValueError, match="Nothing selected, cannot remove from list"):
         or_wid_class.add_widget._remove(None)
 
@@ -471,19 +509,19 @@ def test_user_selection(page_session: playwright.sync_api.Page, get_model):
     # Test the structure of the override widget return
     or_selection = or_wid_class.return_value()
     assert isinstance(or_selection, OverrideSelections)
-    assert isinstance(or_selection.remove_widget_return, WidgetReturn)
-    assert isinstance(or_selection.add_widget_return, AddWidgetReturn)
-    assert isinstance(or_selection.lock_widget_return, WidgetReturn)
+    assert isinstance(or_selection.remove_widget_return, OverrideRemoveLockInfo)
+    assert isinstance(or_selection.add_widget_return, OverrideAddInfo)
+    assert isinstance(or_selection.lock_widget_return, OverrideRemoveLockInfo)
     assert hasattr(or_selection.remove_widget_return, "cluster")
     assert hasattr(or_selection.remove_widget_return, "well")
-    assert hasattr(or_selection.add_widget_return, "existing_cluster")
-    assert hasattr(or_selection.add_widget_return, "new_cluster")
+    assert hasattr(or_selection.add_widget_return, "existing_clusters")
+    assert hasattr(or_selection.add_widget_return, "new_clusters")
     assert hasattr(or_selection.lock_widget_return, "cluster")
     assert hasattr(or_selection.lock_widget_return, "well")
 
     assert or_selection.remove_widget_return.cluster == [13]
-    assert or_selection.remove_widget_return.well == {1: [789]}
-    assert or_selection.add_widget_return.existing_cluster == {11: [80]}
-    assert or_selection.add_widget_return.new_cluster == {1: [80], 6: []}
+    assert or_selection.remove_widget_return.well == {1: [789], 13: [49, 67, 88, 210]}
+    assert or_selection.add_widget_return.existing_clusters == {11: [80]}
+    assert or_selection.add_widget_return.new_clusters == {1: [80], 6: []}
     assert or_selection.lock_widget_return.cluster == [19]
     assert or_selection.lock_widget_return.well == {19: [21, 83, 182, 280, 981]}
