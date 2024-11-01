@@ -872,7 +872,7 @@ class UserSelection:
 
     Parameters
     ----------
-    opt_campaign: dict
+    opt_campaign: Dict[int,List[int]]
         Dictionary of the optimal campaigns obtained from the optimization problem
 
     model_inputs: OptModelInputs
@@ -1031,17 +1031,27 @@ class UserSelection:
 
     def return_value(self):
         """A wrapper for returning selections of all widgets"""
-        well_removed_dict, well_removed_list = self._return_well_index_cluster(
+
+        # Projects chose to be removed through the remove project button
+        cluster_remove_list = self.remove_widget.cluster_widget.return_selections()
+
+        # Wells chose to be removed through the remove well button
+        well_remove_dict, well_remove_list = self._return_well_index_cluster(
             self.remove_widget.return_selections()
         )
-        remove_widget_return = WidgetReturn(
-            self.remove_widget.cluster_widget.return_selections(),
-            well_removed_dict,
+
+        # Add wells belongs to the removed project to the well_remove_dict
+        for cluster in cluster_remove_list:
+            well_remove_dict[cluster] = list(self.opt_campaign[cluster])
+
+        remove_widget_return = OverrideRemoveLockInfo(
+            cluster_remove_list,
+            well_remove_dict,
         )
 
         existing_clusters, new_clusters = self.add_widget.return_selections()
         well_add_dict, _ = self._return_well_index_cluster(existing_clusters)
-        add_widget_return = AddWidgetReturn(well_add_dict, new_clusters)
+        add_widget_return = OverrideAddInfo(well_add_dict, new_clusters)
 
         cluster_lock_list = self.lock_widget.cluster_widget.return_selections()
         well_lock_dict, _ = self._return_well_index_cluster(
@@ -1051,10 +1061,10 @@ class UserSelection:
             well_lock_dict[cluster] = [
                 well
                 for well in self.opt_campaign[cluster]
-                if well not in well_removed_list
+                if well not in well_remove_list
             ]
 
-        lock_widget_return = WidgetReturn(cluster_lock_list, well_lock_dict)
+        lock_widget_return = OverrideRemoveLockInfo(cluster_lock_list, well_lock_dict)
 
         return OverrideSelections(
             remove_widget_return=remove_widget_return,
@@ -1064,16 +1074,16 @@ class UserSelection:
 
 
 @dataclass
-class WidgetReturn:
+class OverrideRemoveLockInfo:
     """
-    Class for storing the widget return
+    Class for storing the information returns from the remove and lock widget
 
     Parameters
     ----------
-    cluster : List
+    cluster : List[int]
         List of projects that are removed or locked
 
-    well : Dict
+    well : Dict[int, List[int]]
         Dictionary of list of wells that are removed or locked in a cluster
     """
 
@@ -1081,32 +1091,34 @@ class WidgetReturn:
     well: Dict[int, List[int]]
 
     def __str__(self):
-        return f"WidgetReturn(project={self.cluster}, " f"well_dict={self.well})"
+        return (
+            f"OverrideRemoveLockInfo(project={self.cluster}, " f"well_dict={self.well})"
+        )
 
 
 @dataclass
-class AddWidgetReturn:
+class OverrideAddInfo:
     """
     Class for storing the add widget return
 
     Parameters
     ----------
-    existing_cluster : Dict
+    existing_clusters : Dict[int, List[int]]
         Dictionary of list of wells being added and their original cluster;
         key=> cluster, value=> well list
 
-    new_cluster : Dict
+    new_clusters : Dict[int, List[int]]
         Dictionary of list of wells being added and their new cluster;
         key=> cluster, value=> well list
     """
 
-    existing_cluster: Dict[int, List[int]]
-    new_cluster: Dict[int, List[int]]
+    existing_clusters: Dict[int, List[int]]
+    new_clusters: Dict[int, List[int]]
 
     def __str__(self):
         return (
-            f"AddWidgetReturn(existing_cluster_dict={self.existing_cluster}, "
-            f"new_cluster_dict={self.new_cluster})"
+            f"OverrideAddInfo(existing_cluster_dict={self.existing_clusters}, "
+            f"new_cluster_dict={self.new_clusters})"
         )
 
 
@@ -1117,19 +1129,19 @@ class OverrideSelections:
 
     Parameters
     ----------
-    remove_widget_return : WidgetReturn
+    remove_widget_return : OverrideRemoveLockInfo
         Object returned by the remove_widget
 
-    add_widget_return : AddWidgetReturn
+    add_widget_return : OverrideAddInfo
         Object returned by the add_widget
 
-    lock_widget_return : WidgetReturn
+    lock_widget_return : OverrideRemoveLockInfo
         Object returned by the lock_widget
     """
 
-    remove_widget_return: WidgetReturn
-    add_widget_return: AddWidgetReturn
-    lock_widget_return: WidgetReturn
+    remove_widget_return: OverrideRemoveLockInfo
+    add_widget_return: OverrideAddInfo
+    lock_widget_return: OverrideRemoveLockInfo
 
     def __str__(self):
         return (

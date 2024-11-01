@@ -131,6 +131,8 @@ class AssessFeasibility:
         """
         distance_threshold = self.opt_inputs.config.threshold_distance
         distance_violation = {}
+        # Assign weight for distance as 1 to ensure the distance matrix returns physical
+        # distance between two well pairs
         metric_array = distance_matrix(self.wd, {"distance": 1})
         df_to_array = {
             df_index: array_index
@@ -238,7 +240,7 @@ class OverrideCampaign:
                     self.new_campaign[cluster].remove(well)
 
         # add well with new cluster
-        for cluster, well_list in self.add.new_cluster.items():
+        for cluster, well_list in self.add.new_clusters.items():
             self.new_campaign.setdefault(cluster, []).extend(well_list)
 
     def violation_info(self):
@@ -332,16 +334,12 @@ class OverrideCampaign:
         re_optimize_cluster_dict = {}
         re_optimize_well_dict = {}
 
-        # Assign 0 to clusters being removed
-        for cluster in self.remove.cluster:
-            re_optimize_cluster_dict[cluster] = 0
-
         # Assign 0 to wells being removed
         for cluster, well_list in self.remove.well.items():
             re_optimize_well_dict[cluster] = {well: 0 for well in well_list}
 
         # Assign 1 to wells being added
-        for cluster, well_list in self.add.new_cluster.items():
+        for cluster, well_list in self.add.new_clusters.items():
             if cluster not in re_optimize_well_dict:
                 re_optimize_well_dict[cluster] = {}
             for well in well_list:
