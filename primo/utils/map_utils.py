@@ -215,22 +215,22 @@ def create_map_with_legend(state_shapefile: gpd.GeoDataFrame) -> folium.Map:
     map_center = get_mean_centroid(state_shapefile)
     map_obj = folium.Map(location=map_center, zoom_start=8.2)
 
-    gas_legend = '<i style="color:red">o - Gas Well</i>'
-    oil_legend = '<i style="color:blue">x - Oil Well</i>'
-    legend_html = f"""
-    <div style="position: fixed;
-                 top: 10px; right: 10px; width: 120px; height: 80px;
-                 border:2px solid grey; z-index:9999; font-size:14px;
-                 background-color: white;
-                 ">
-      <center>
-      <br>
-      {gas_legend}<br>
-      {oil_legend}<br>
-      </center>
-    </div>
-    """
-    map_obj.get_root().html.add_child(folium.Element(legend_html))
+    # gas_legend = '<i style="color:red">o - Gas Well</i>'
+    # oil_legend = '<i style="color:blue">x - Oil Well</i>'
+    # legend_html = f"""
+    # <div style="position: fixed;
+    #              top: 10px; right: 10px; width: 120px; height: 80px;
+    #              border:2px solid grey; z-index:9999; font-size:14px;
+    #              background-color: white;
+    #              ">
+    #   <center>
+    #   <br>
+    #   {gas_legend}<br>
+    #   {oil_legend}<br>
+    #   </center>
+    # </div>
+    # """
+    # map_obj.get_root().html.add_child(folium.Element(legend_html))
     return map_obj
 
 
@@ -528,25 +528,25 @@ def add_project_markers_to_map(
     """
     # gas_index = selected.columns.get_loc("Gas [Mcf/Year]") + 1
     # oil_index = selected.columns.get_loc("Oil [bbl/Year]") + 1
-    # score_index = selected.columns.get_loc("Priority Score [0-100]") + 1
+    score_index = selected.columns.get_loc("Priority Score [0-100]") + 1
     for row in selected.itertuples():
         # if pd.isna(row.Project):
         #     continue
         # gas = row[gas_index]
         # oil = row[oil_index]
-        # cluster = "Project: " + str(row.Project)
-        # score = row[score_index]
-        # popup_text = (
-        #     f"Oil [bbl/day]: {oil}<br>Gas [Mcf/day]: {gas}<br>"
-        #     f"Candidate Project: {cluster}<br>Score: {score}<br>"
-        # )
+        well = str(row.Well_name)
+        cluster = "Project: " + str(row.Clusters)
+        score = row[score_index]
+        popup_text = (
+            f"Well Nam: {well}<br>Candidate Project: {cluster}<br>Score: {score}<br>"
+        )
         color = cluster_colors.get(
-            row.Project, "gray"
+            row.Clusters, "gray"
         )  # Use 'gray' if cluster not in color scheme
         folium.CircleMarker(
             location=[row.Latitude, row.Longitude],
             radius=5,
-            # popup=popup_text,
+            popup=popup_text,
             fill=True,
             color=color,
         ).add_to(map_obj)
@@ -575,7 +575,7 @@ def visualize_data_with_projects(
         zoom_start=7,
     )
     common_visualization(map_obj, state_shapefile)
-    cluster_list = pd.unique(selected["Project"])
+    cluster_list = pd.unique(selected["Clusters"])
     num_cluster = len(cluster_list)
     cluster_colors = get_cluster_colors(num_cluster, cluster_list)
     add_project_markers_to_map(selected, map_obj, cluster_colors)

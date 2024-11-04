@@ -68,8 +68,8 @@ class Project:
             col_names.operator_name,
             col_names.latitude,
             col_names.longitude,
-            col_names.age,
-            col_names.depth,
+            # col_names.age,
+            # col_names.depth,
             col_names.priority_score,
         ]
         self._priority_score_cols = wd.get_priority_score_columns
@@ -545,16 +545,16 @@ class Campaign:
             col_names.well_id,
             col_names.operator_name,
             col_names.priority_score,
-            col_names.ann_gas_production,
-            col_names.ann_oil_production,
-            col_names.age,
-            col_names.depth,
+            # col_names.ann_gas_production,
+            # col_names.ann_oil_production,
+            # col_names.age,
+            # col_names.depth,
             col_names.latitude,
             col_names.longitude,
-            col_names.leak,
-            col_names.compliance,
-            col_names.violation,
-            col_names.incident,
+            # col_names.leak,
+            # col_names.compliance,
+            # col_names.violation,
+            # col_names.incident,
         ]
         # add hospitals and schools if provided
         if col_names.hospitals is not None:
