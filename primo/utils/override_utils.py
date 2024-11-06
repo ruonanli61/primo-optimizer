@@ -219,6 +219,8 @@ class OverrideCampaign:
         self.plug_list = []
         for _, well_list in self.new_campaign.items():
             self.plug_list += well_list
+        # prevent duplication in plug_list
+        self.plug_list = list(set(self.plug_list))
         self.wd = self.opt_inputs.config.well_data._construct_sub_data(self.plug_list)
 
         self.feasibility = AssessFeasibility(

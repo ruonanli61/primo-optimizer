@@ -834,6 +834,12 @@ class SelectWidgetAdd(SelectWidget):
                 ]  # Update to the cluster of the selected well
 
     def _add(self, _) -> None:
+        if self._text not in self.wd.data[self.wd._col_names.well_id].values:
+            raise_exception(
+                "The well is already assigned to a project. It must be removed "
+                "from the current project before it can be assigned to another one.",
+                ValueError,
+            )
         super()._add(_)
         well_index = self.wd.data[
             self.wd.data[self.wd._col_names.well_id] == self._text
