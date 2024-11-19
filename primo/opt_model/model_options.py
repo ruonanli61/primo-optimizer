@@ -161,7 +161,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
     CONFIG = model_config()
 
     @document_kwargs_from_configdict(CONFIG)
-    def __init__(self, **kwargs):
+    def __init__(self, cluster_mapping=None, **kwargs):
         # Update the values of all the inputs
         # ConfigDict handles KeyError, other input errors, and domain errors
         LOGGER.info("Processing optimization model inputs.")
@@ -186,27 +186,45 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
             )
             raise_exception(msg, ValueError)
 
-        # Construct campaign candidates
-        # Step 1: Perform clustering, Should distance_threshold be a user argument?
-        perform_clustering(wd, distance_threshold=10.0)
-
-        # Step 2: Identify list of wells belonging to each cluster
-        # Structure: {cluster_1: [index_1, index_2,..], cluster_2: [], ...}
         col_names = wd.col_names
-        set_clusters = set(wd[col_names.cluster])
-        self.campaign_candidates = {
-            cluster: list(wd.data[wd[col_names.cluster] == cluster].index)
-            for cluster in set_clusters
-        }
+        if cluster_mapping is None:
+            logging.info("Clustering Data in Opt Model Inputs")
+            # Construct campaign candidates
+            # Step 1: Perform clustering, Should distance_threshold be a user argument?
+            perform_clustering(wd, distance_threshold=10.0)
 
+            # Step 2: Identify list of wells belonging to each cluster
+            # Structure: {cluster_1: [index_1, index_2,..], cluster_2: [], ...}
+            set_clusters = set(wd[col_names.cluster])
+            self.campaign_candidates = {
+                cluster: list(wd.data[wd[col_names.cluster] == cluster].index)
+                for cluster in set_clusters
+            }
+            self.pairwise_distance = self._pairwise_matrix(metric="distance")
+            self.pairwise_age_difference = self._pairwise_matrix(metric="age")
+            self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
+
+        else:
+            logging.info("Skipping clustering step in Opt Model Inputs")
+            self.campaign_candidates = cluster_mapping
+            well_cluster_map = {index: "" for index in wd.data.index}
+            for cluster, wells in self.campaign_candidates.items():
+                for well in wells:
+                    well_cluster_map[well] = cluster
+            for _, value in well_cluster_map.items():
+                assert value != ""
+            cluster_col_values = [cluster for _, cluster in well_cluster_map.items()]
+            wd.data["Clusters"] = cluster_col_values
+            col_names.register_new_columns({"cluster": "Clusters"})
+
+            self.pairwise_distance = {}
+            self.pairwise_age_difference = {}
+            self.pairwise_depth_difference = {}
         # Step 3: Construct pairwise-metrics between wells in each cluster.
         # Structure: {cluster: {(index_1, index_2): distance_12, ...}...}
-        self.pairwise_distance = self._pairwise_matrix(metric="distance")
-        self.pairwise_age_difference = self._pairwise_matrix(metric="age")
-        self.pairwise_depth_difference = self._pairwise_matrix(metric="depth")
 
         # Construct owner well count data
-        if wd.config.ignore_operator_name:
+        if wd.config.verify_operator_name:
             operator_list = set(wd[col_names.operator_name])
             self.owner_well_count = {owner: [] for owner in operator_list}
             for well in wd:

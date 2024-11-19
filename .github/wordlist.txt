@@ -32,6 +32,7 @@ Submetrics
 Uncomment
 USD
 Vbox
+acs
 arg
 argparse
 astype
@@ -69,6 +70,7 @@ libs
 monkeypatch
 msg
 multicommodity
+mybinder
 nanmean
 ndarray
 np
@@ -77,12 +79,15 @@ numpy
 param
 pathlib
 pre
+primo
 pyo
 quickstart
 scikit
 shapefile
 shapefiles
 stacktrace
+stagedfright
+str
 sublicense
 submetric
 submetrics

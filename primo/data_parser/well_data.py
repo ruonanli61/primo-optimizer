@@ -823,7 +823,7 @@ class WellData:
 
         # Drop wells if the operator name is not available
         unknown_owner = []
-        if self.config.ignore_operator_name:
+        if self.config.verify_operator_name:
             LOGGER.info("Checking if the operator name is available for all wells.")
             self.drop_incomplete_data(
                 col_name=wcn.operator_name, dict_key="operator_name"
@@ -865,7 +865,7 @@ class WellData:
         # Assuming that no well is older than 350 year old
         # Assuming that no well is deeper than 40000 ft
         self.check_data_in_range(wcn.latitude, -90, 90)
-        self.check_data_in_range(wcn.longitude, -90, 90)
+        self.check_data_in_range(wcn.longitude, -180, 180)
         self.check_data_in_range(wcn.age, 0.0, 350.0)
         self.check_data_in_range(wcn.depth, 0.0, 40000.0)
 
