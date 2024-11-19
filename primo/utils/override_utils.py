@@ -262,8 +262,8 @@ class OverrideCampaign:
                 msg = (
                     "After the modification, the total budget is over "
                     f"the limit by ${int(violate_cost)}. Please consider modifying "
-                    "wells you have selected by either using the widget above or "
-                    "by re-running the optimization problem."
+                    "wells you have selected or "
+                    "re-running the optimization problem."
                 )
 
                 violation_info_dict[msg] = """"""
@@ -273,7 +273,7 @@ class OverrideCampaign:
                     "After the modification, the following owners have "
                     f"more than {self.opt_inputs.config.max_wells_per_owner} well(s) "
                     "being selected. Please consider modifying wells you have "
-                    "selected by either using the widget above or by re-running "
+                    "selected or re-running "
                     "the optimization problem."
                 )
 
@@ -284,7 +284,7 @@ class OverrideCampaign:
                 msg = (
                     "After the modification, the following projects have "
                     "wells are far away from each others. Please consider modifying "
-                    "wells you have selected by either using the widget above or by "
+                    "wells you have selected or "
                     "re-running the optimization problem."
                 )
 
@@ -295,9 +295,7 @@ class OverrideCampaign:
                 dac_percent = self.opt_inputs.config.perc_wells_in_dac - violate_dac
                 msg = (
                     f"After the modification, {int(dac_percent)}% of well "
-                    "is in DAC. Please consider modifying wells you have selected "
-                    "by either using the widget above or by re-running the optimization "
-                    "problem."
+                    "is in DAC. Please consider modifying wells you have selected."
                 )
                 violation_info_dict[msg] = """"""
         else:
@@ -321,6 +319,8 @@ class OverrideCampaign:
         override_campaign = self.override_campaign()
         override_campaign.set_efficiency_weights(self.eff_metrics)
         override_campaign.compute_efficiency_scores()
+        logging.disable(logging.NOTSET)
+        logging.basicConfig(level=logging.INFO)
         return override_campaign
 
     def recalculate_scores(self):
