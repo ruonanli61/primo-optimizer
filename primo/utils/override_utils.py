@@ -205,7 +205,6 @@ class OverrideCampaign:
         opt_campaign: Dict,
         eff_metrics,
     ):
-        logging.getLogger("Campaign").setLevel(logging.WARNING)
         opt_campaign_copy = copy.deepcopy(opt_campaign)
         self.new_campaign = opt_campaign_copy
         self.remove = override_selections.remove_widget_return
@@ -315,12 +314,9 @@ class OverrideCampaign:
         Recalculate the efficiency scores and impact scores of the new campaign
         based on the override selection
         """
-        logging.disable(logging.CRITICAL)
         override_campaign = self.override_campaign()
         override_campaign.set_efficiency_weights(self.eff_metrics)
         override_campaign.compute_efficiency_scores()
-        logging.disable(logging.NOTSET)
-        logging.basicConfig(level=logging.INFO)
         return override_campaign
 
     def recalculate_scores(self):
