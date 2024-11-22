@@ -278,8 +278,6 @@ class Project:
         value : Union[int, float]
             The value to update the efficiency score with
         """
-        if len(self.well_data) == 1:
-            return
         self.efficiency_score += value
 
     def get_well_info_dataframe(self):
@@ -431,8 +429,8 @@ class Campaign:
         ax = plt.gca()
         for _, project in self.projects.items():
             ax.scatter(
-                project.well_data[project.col_names.latitude],
                 project.well_data[project.col_names.longitude],
+                project.well_data[project.col_names.latitude],
             )
         plt.title(title)
         plt.xlabel("x-coordinate of wells")
@@ -462,6 +460,21 @@ class Campaign:
             The efficiency score of the project
         """
         return self.projects[project_id].efficiency_score
+
+    def get_impact_score_project(self, project_id: int) -> float:
+        """
+        Returns the impact score of a project in the campaign given its id
+        Parameters
+        ----------
+        project_id : int
+            Project id
+
+        Returns
+        -------
+        float
+            The impact score of the project
+        """
+        return self.projects[project_id].impact_score
 
     def _extract_column_header_for_efficiency_metrics(self, attribute_name: str):
         """
@@ -509,11 +522,27 @@ class Campaign:
                     ]
                 ),
             )
-            data = list(zip(project_column, *attribute_data, accessibility_data))
+            efficiency_scores = [
+                project.efficiency_score for _, project in self.projects.items()
+            ]
+
+            data = list(
+                zip(
+                    project_column,
+                    *attribute_data,
+                    accessibility_data,
+                    efficiency_scores,
+                )
+            )
             header.append(f"Accessibility Score [0-{total_weights[0]}]")
+            header.append("Efficiency Score [0-100]")
         # if there is data for the accessibility score
         else:
-            data = list(zip(project_column, *attribute_data))
+            efficiency_scores = [
+                project.efficiency_score for _, project in self.projects.items()
+            ]
+            header.append("Efficiency Score [0-100]")
+            data = list(zip(project_column, *attribute_data, efficiency_scores))
 
         return pd.DataFrame(data, columns=header)
 
@@ -689,9 +718,15 @@ class EfficiencyCalculator:
                 setattr(
                     project,
                     metric.score_attribute,
-                    (
-                        (max_value - getattr(project, metric.name))
-                        / (max_value - min_value)
+                    max(
+                        0,
+                        min(
+                            1,
+                            (
+                                (max_value - getattr(project, metric.name))
+                                / (max_value - min_value)
+                            ),
+                        ),
                     )
                     * metric.effective_weight,
                 )
@@ -700,9 +735,13 @@ class EfficiencyCalculator:
                 setattr(
                     project,
                     metric.score_attribute,
-                    (
-                        (getattr(project, metric.name) - min_value)
-                        / (max_value - min_value)
+                    max(
+                        0,
+                        min(
+                            1,
+                            (getattr(project, metric.name) - min_value)
+                            / (max_value - min_value),
+                        ),
                     )
                     * metric.effective_weight,
                 )
