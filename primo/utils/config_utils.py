@@ -266,7 +266,7 @@ class CheckBoxWidget:
         The horizontal box that contains the checkbox and slider appended together
     """
 
-    def __init__(  # pylint: disable=[too-many-arguments,too-many-positional-arguments]
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         description: str,
         default: int,
@@ -697,7 +697,7 @@ class BaseSelectWidget:
         """
         Return the list of selections made by the user
         """
-        return self.selected_list
+        return [int(item) for item in self.selected_list]
 
     def _pass_current_selection(self):
         """
@@ -733,7 +733,7 @@ class SubSelectWidget(BaseSelectWidget):
         The max number of options displayed for the override widgets
     """
 
-    # pylint: disable = too-many-arguments,too-many-positional-arguments
+    # pylint: disable = too-many-arguments
     def __init__(
         self,
         cluster_choices: List[int],
@@ -1070,8 +1070,9 @@ class UserSelection:
         display("Add wells", add_container)
         display("Lock projects/wells", lock_container)
 
-    def _return_well_index_cluster(self, selections):
-        """Obtain index of selected wells according to their API Well Number"""
+    def _return_well_index_cluster(self, selections: List[int]):
+        """Obtain index of a list of selected wells according to their
+        API Well Number"""
         selections_dict = {}
         selections_list = []
         for well in selections:
@@ -1107,12 +1108,14 @@ class UserSelection:
 
         existing_clusters, new_clusters = self.add_widget.return_selections()
         well_add_dict, _ = self._return_well_index_cluster(existing_clusters)
+
         add_widget_return = OverrideAddInfo(well_add_dict, new_clusters)
 
         cluster_lock_list = self.lock_widget.cluster_widget.return_selections()
         well_lock_dict, _ = self._return_well_index_cluster(
             self.lock_widget.return_selections()
         )
+
         for cluster in cluster_lock_list:
             well_lock_dict[cluster] = [
                 well
@@ -1123,9 +1126,76 @@ class UserSelection:
         lock_widget_return = OverrideRemoveLockInfo(cluster_lock_list, well_lock_dict)
 
         return OverrideSelections(
-            remove_widget_return=remove_widget_return,
-            add_widget_return=add_widget_return,
-            lock_widget_return=lock_widget_return,
+            remove_return=remove_widget_return,
+            add_return=add_widget_return,
+            lock_return=lock_widget_return,
+        )
+
+    def _return_well_index(self, selections: Dict[int, [int]]):
+        """Obtain index of a list of selected wells according to their
+        API Well Number"""
+        selections_dict = {}
+        selections_list = []
+        for cluster, well_list in selections.items():
+            for well in well_list:
+                well_index = self.wd.data[
+                    self.wd.data[self.wd._col_names.well_id] == str(well)
+                ].index.item()
+            selections_dict.setdefault(cluster, []).append(well_index)
+            selections_list.append(well_index)
+        return selections_dict, selections_list
+
+    def return_value_dict(self, override_dict=None):
+        # pylint: disable=too-many-locals
+        """A function for process override selection input from the user"""
+        # Process the remove information
+        remove_data = override_dict.get("remove", {})
+        cluster_remove_list = remove_data.get("project", [])
+        well_remove = remove_data.get("well", {})
+        well_remove_dict, well_remove_list = self._return_well_index(well_remove)
+
+        # Add wells belongs to the removed project to the well_remove_dict
+        for cluster in cluster_remove_list:
+            well_remove_dict[cluster] = list(self.opt_campaign[cluster])
+
+        remove_return = OverrideRemoveLockInfo(
+            cluster_remove_list,
+            well_remove_dict,
+        )
+
+        # Process the add information
+        add_data = override_dict.get("add", {})
+        well_add = add_data.get("well", {})
+
+        well_add_list = []
+        for _, well_list in well_add.items():
+            for well in well_list:
+                well_add_list.append(well)
+
+        well_add_dict, _ = self._return_well_index_cluster(well_add_list)
+        new_clusters, _ = self._return_well_index(well_add)
+
+        add_return = OverrideAddInfo(well_add_dict, new_clusters)
+
+        # Process the lock information
+        lock_data = override_dict.get("lock", {})
+        cluster_lock_list = lock_data.get("project", [])
+        well_lock = lock_data.get("well", {})
+        well_lock_dict, _ = self._return_well_index(well_lock)
+
+        for cluster in cluster_lock_list:
+            well_lock_dict[cluster] = [
+                well
+                for well in self.opt_campaign[cluster]
+                if well not in well_remove_list
+            ]
+
+        lock_return = OverrideRemoveLockInfo(cluster_lock_list, well_lock_dict)
+
+        return OverrideSelections(
+            remove_return=remove_return,
+            add_return=add_return,
+            lock_return=lock_return,
         )
 
 
@@ -1159,8 +1229,8 @@ class OverrideAddInfo:
 
     Parameters
     ----------
-    existing_clusters : Dict[int, List[int]]
-        Dictionary of list of wells being added and their original cluster;
+    existing_clusters : List[int]
+        Dictionary of list of wells being added;
         key=> cluster, value=> well list
 
     new_clusters : Dict[int, List[int]]
@@ -1168,7 +1238,7 @@ class OverrideAddInfo:
         key=> cluster, value=> well list
     """
 
-    existing_clusters: Dict[int, List[int]]
+    existing_clusters: List[int]
     new_clusters: Dict[int, List[int]]
 
     def __str__(self):
@@ -1182,27 +1252,31 @@ class OverrideAddInfo:
 class OverrideSelections:
     """
     Class for storing the return from the remove_widget, add_widget, and lock_widget
+    or the override dictionary provided by the users
 
     Parameters
     ----------
-    remove_widget_return : OverrideRemoveLockInfo
-        Object returned by the remove_widget
+    remove_return : OverrideRemoveLockInfo
+        Object returned by the remove_widget or the dictionary that provided by users
+        which includes projects and wells that desired to be removed
 
-    add_widget_return : OverrideAddInfo
-        Object returned by the add_widget
+    add_return : OverrideAddInfo
+        Object returned by the add_widget or the dictionary that provided by users
+        which includes wells that desired to be added or transferred
 
-    lock_widget_return : OverrideRemoveLockInfo
-        Object returned by the lock_widget
+    lock_return : OverrideRemoveLockInfo
+        Object returned by the lock_widget or the dictionary that provided by users
+        which includes projects and wells that desired to be locked
     """
 
-    remove_widget_return: OverrideRemoveLockInfo
-    add_widget_return: OverrideAddInfo
-    lock_widget_return: OverrideRemoveLockInfo
+    remove_return: OverrideRemoveLockInfo
+    add_return: OverrideAddInfo
+    lock_return: OverrideRemoveLockInfo
 
     def __str__(self):
         return (
             f"OverrideSelections("
-            f"remove_widget_return={self.remove_widget_return}, "
-            f"add_widget_return={self.add_widget_return}, "
-            f"lock_widget_return={self.lock_widget_return})"
+            f"remove_return={self.remove_return}, "
+            f"add_return={self.add_return}, "
+            f"lock_return={self.lock_return})"
         )

@@ -527,19 +527,45 @@ def test_user_selection(
     # Test the structure of the override widget return
     or_selection = or_wid_class.return_value()
     assert isinstance(or_selection, OverrideSelections)
-    assert isinstance(or_selection.remove_widget_return, OverrideRemoveLockInfo)
-    assert isinstance(or_selection.add_widget_return, OverrideAddInfo)
-    assert isinstance(or_selection.lock_widget_return, OverrideRemoveLockInfo)
-    assert hasattr(or_selection.remove_widget_return, "cluster")
-    assert hasattr(or_selection.remove_widget_return, "well")
-    assert hasattr(or_selection.add_widget_return, "existing_clusters")
-    assert hasattr(or_selection.add_widget_return, "new_clusters")
-    assert hasattr(or_selection.lock_widget_return, "cluster")
-    assert hasattr(or_selection.lock_widget_return, "well")
+    assert isinstance(or_selection.remove_return, OverrideRemoveLockInfo)
+    assert isinstance(or_selection.add_return, OverrideAddInfo)
+    assert isinstance(or_selection.lock_return, OverrideRemoveLockInfo)
+    assert hasattr(or_selection.remove_return, "cluster")
+    assert hasattr(or_selection.remove_return, "well")
+    assert hasattr(or_selection.add_return, "existing_clusters")
+    assert hasattr(or_selection.add_return, "new_clusters")
+    assert hasattr(or_selection.lock_return, "cluster")
+    assert hasattr(or_selection.lock_return, "well")
 
-    assert or_selection.remove_widget_return.cluster == [13]
-    assert or_selection.remove_widget_return.well == {1: [789], 13: [49, 67, 88, 210]}
-    assert or_selection.add_widget_return.existing_clusters == {11: [80]}
-    assert or_selection.add_widget_return.new_clusters == {1: [80], 6: []}
-    assert or_selection.lock_widget_return.cluster == [19]
-    assert or_selection.lock_widget_return.well == {19: [21, 83, 182, 280, 981]}
+    assert or_selection.remove_return.cluster == [13]
+    assert or_selection.remove_return.well == {1: [789], 13: [49, 67, 88, 210]}
+    assert or_selection.add_return.existing_clusters == {11: [80]}
+    assert or_selection.add_return.new_clusters == {1: [80], 6: []}
+    assert or_selection.lock_return.cluster == [19]
+    assert or_selection.lock_return.well == {19: [21, 83, 182, 280, 981]}
+
+
+def test_user_selection_with_dict(get_model):
+    """
+    Test when users provide override choice using dictionary
+    """
+    opt_campaign, opt_mdl_inputs, _ = get_model
+
+    or_wid_class = UserSelection(opt_campaign.clusters_dict, opt_mdl_inputs)
+
+    override_dict = {
+        "remove": {"project": [13], "well": {1: [58876, 73984], 11: [52884]}},
+        "add": {"well": {6: [69254], 13: [94343], 19: [33912]}},
+        "lock": {"project": [11], "well": {}},
+    }
+    override_selections = or_wid_class.return_value_dict(override_dict)
+
+    assert override_selections.remove_return.cluster == [13]
+    well_remove = override_selections.remove_return.well
+    assert 858 in well_remove[1]
+    existing_clusters = override_selections.add_return.existing_clusters
+    new_clusters = override_selections.add_return.new_clusters
+    assert 600 in existing_clusters[6]
+    assert 13 not in existing_clusters
+    assert 13 in new_clusters
+    assert override_selections.lock_return.well == {11: [101, 118, 180, 272, 274, 397]}
