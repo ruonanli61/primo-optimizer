@@ -1230,7 +1230,7 @@ class OverrideAddInfo:
     Parameters
     ----------
     existing_clusters : Dict[int, List[int]]
-        Dictionary of list of wells being added;
+        Dictionary of list of wells being added and their original cluster;
         key=> cluster, value=> well list
 
     new_clusters : Dict[int, List[int]]
