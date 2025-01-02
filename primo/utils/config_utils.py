@@ -1229,7 +1229,7 @@ class OverrideAddInfo:
 
     Parameters
     ----------
-    existing_clusters : List[int]
+    existing_clusters : Dict[int, List[int]]
         Dictionary of list of wells being added;
         key=> cluster, value=> well list
 
@@ -1238,7 +1238,7 @@ class OverrideAddInfo:
         key=> cluster, value=> well list
     """
 
-    existing_clusters: List[int]
+    existing_clusters: Dict[int, List[int]]
     new_clusters: Dict[int, List[int]]
 
     def __str__(self):
