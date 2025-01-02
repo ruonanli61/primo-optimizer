@@ -214,9 +214,9 @@ class OverrideCampaign:
     ):
         opt_campaign_copy = copy.deepcopy(opt_campaign)
         self.new_campaign = opt_campaign_copy
-        self.remove = override_selections.remove_widget_return
-        self.add = override_selections.add_widget_return
-        self.lock = override_selections.lock_widget_return
+        self.remove = override_selections.remove_return
+        self.add = override_selections.add_return
+        self.lock = override_selections.lock_return
         self.opt_inputs = opt_inputs
         self.eff_metrics = eff_metrics
 
