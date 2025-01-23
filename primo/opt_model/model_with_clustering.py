@@ -367,7 +367,7 @@ class PluggingCampaignModel(ConcreteModel):
         )
         if model_inputs.config.objective_weight_impact < 100:
             if model_inputs.config.efficiency_formulation == "Max Scaling":
-                compute_efficiency_scaling_factors(self)
+                compute_efficiency_scaling_factors(model_inputs)
             for c in self.set_clusters:
                 self.cluster[c].efficiency_model = EfficiencyBlock()
                 self.cluster[c].efficiency_model.build_efficiency_model(

@@ -17,7 +17,7 @@ import logging
 # Installed libs
 import pandas as pd
 from pyomo.core.base.block import BlockData, declare_custom_block
-from pyomo.environ import NonNegativeReals, Set, Var
+from pyomo.environ import NonNegativeReals, Var
 
 # User-defined libs
 from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
@@ -26,7 +26,7 @@ from primo.utils.clustering_utils import get_pairwise_metrics
 LOGGER = logging.getLogger(__name__)
 
 
-def compute_efficiency_scaling_factors(opt_model):
+def compute_efficiency_scaling_factors(opt_model_inputs):
     """
     Checks whether scaling factors for efficiency metrics are provided by
     the user or not. If not, computes the scaling factors using the entire
@@ -34,14 +34,16 @@ def compute_efficiency_scaling_factors(opt_model):
 
     Parameters
     ----------
-    opt_model : PluggingCampaignModel
-        Object containing the optimization model
+    opt_model_inputs : OptModelInputs
+        OptModelInputs object
     """
     LOGGER.info("Computing scaling factors for efficiency metrics")
-    config = opt_model.model_inputs.config
+    config = opt_model_inputs.config
     wd = config.well_data
     eff_metrics = wd.config.efficiency_metrics
     eff_weights = eff_metrics.get_weights
+    set_clusters = set(wd[wd.col_names.cluster])
+    pairwise_metrics = {}
 
     def set_scaling_factor(metric_name, scale_value):
         """Function for logging warning message"""
@@ -75,10 +77,10 @@ def compute_efficiency_scaling_factors(opt_model):
         return
 
     # Append the pairwise metrics to the model
-    for c in opt_model.set_clusters:
-        cm = opt_model.cluster[c]
-        cm.pairwise_metrics = get_pairwise_metrics(wd, cm.set_wells)
-        cm.set_well_pairs = Set(initialize=cm.pairwise_metrics.index.to_list())
+    for c in set_clusters:
+        pairwise_metrics[c] = get_pairwise_metrics(
+            wd, (wd[wd.col_names.cluster] == c).index
+        )
 
     for metric in WELL_PAIR_METRICS:
         if (
@@ -86,11 +88,9 @@ def compute_efficiency_scaling_factors(opt_model):
             and getattr(config, "max_" + metric) is None
         ):
             # Metric is chosen, but the scaling factor is not specified
-            scale_value = max(
-                opt_model.cluster[c].pairwise_metrics[metric].max()
-                for c in opt_model.set_clusters
-            )
+            scale_value = max(pairwise_metrics[c][metric].max() for c in set_clusters)
             set_scaling_factor(metric, scale_value)
+    opt_model_inputs.pairwise_metrics = pairwise_metrics
 
 
 @declare_custom_block("MaxFormulationBlock")
@@ -207,10 +207,11 @@ def build_cluster_efficiency_model(eff_blk):
             continue
 
         # pylint: disable = undefined-variable
+        pairwise_metrics = cm.parent_block().model_inputs.pairwise_metrics[cm.index()]
         setattr(eff_blk, metric, MaxFormulationBlock())
         getattr(eff_blk, metric).compute_metric_score(
             weight=getattr(weights, metric),
-            metric_data=cm.pairwise_metrics[metric],
+            metric_data=pairwise_metrics[metric],
             scaling_factor=getattr(sf, "max_" + metric),
             metric_type="well_pair",
         )
