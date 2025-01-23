@@ -580,7 +580,7 @@ class PluggingCampaignModel(ConcreteModel):
                     optimal_campaign[c].append(w)
 
         wd = self.model_inputs.config.well_data
-        return Campaign(wd, optimal_campaign, plugging_cost)
+        return Campaign(wd, optimal_campaign, plugging_cost, self.model_inputs)
 
     def get_solution_pool(self, solver):
         """
@@ -627,6 +627,7 @@ class PluggingCampaignModel(ConcreteModel):
                 wd=self.model_inputs.config.well_data,
                 clusters_dict=optimal_campaign,
                 plugging_cost=plugging_cost,
+                opt_model_inputs=self.model_inputs,
             )
 
         return solution_pool
