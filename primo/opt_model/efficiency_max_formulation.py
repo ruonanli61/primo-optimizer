@@ -42,8 +42,6 @@ def compute_efficiency_scaling_factors(opt_model_inputs):
     wd = config.well_data
     eff_metrics = wd.config.efficiency_metrics
     eff_weights = eff_metrics.get_weights
-    set_clusters = set(wd[wd.col_names.cluster])
-    pairwise_metrics = {}
 
     def set_scaling_factor(metric_name, scale_value):
         """Function for logging warning message"""
@@ -77,9 +75,9 @@ def compute_efficiency_scaling_factors(opt_model_inputs):
         return
 
     # Append the pairwise metrics to the model
-    for c in set_clusters:
-        pairwise_metrics[c] = get_pairwise_metrics(
-            wd, (wd[wd.col_names.cluster] == c).index
+    for c in opt_model_inputs.campaign_candidates:
+        opt_model_inputs.pairwise_metrics[c] = get_pairwise_metrics(
+            wd, opt_model_inputs.campaign_candidates[c]
         )
 
     for metric in WELL_PAIR_METRICS:
@@ -88,9 +86,11 @@ def compute_efficiency_scaling_factors(opt_model_inputs):
             and getattr(config, "max_" + metric) is None
         ):
             # Metric is chosen, but the scaling factor is not specified
-            scale_value = max(pairwise_metrics[c][metric].max() for c in set_clusters)
+            scale_value = max(
+                opt_model_inputs.pairwise_metrics[c][metric].max()
+                for c in opt_model_inputs.campaign_candidates
+            )
             set_scaling_factor(metric, scale_value)
-    opt_model_inputs.pairwise_metrics = pairwise_metrics
 
 
 @declare_custom_block("MaxFormulationBlock")

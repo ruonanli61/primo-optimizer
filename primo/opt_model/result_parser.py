@@ -22,9 +22,11 @@ import pandas as pd
 
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics
-from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
 from primo.data_parser.well_data import WellData
-from primo.utils.clustering_utils import distance_matrix, get_pairwise_metrics
+from primo.opt_model.efficiency_max_formulation import (
+    compute_efficiency_scaling_factors,
+)
+from primo.utils.clustering_utils import distance_matrix
 
 LOGGER = logging.getLogger(__name__)
 
@@ -809,76 +811,6 @@ class EfficiencyCalculator:
         """
         self.compute_efficiency_attributes_for_all_projects()
         self.compute_overall_efficiency_scores_campaign()
-
-
-def compute_efficiency_scaling_factors(opt_model_inputs):
-    """
-    Checks whether scaling factors for efficiency metrics are provided by
-    the user or not. If not, computes the scaling factors using the entire
-    dataset.
-
-    Parameters
-    ----------
-    wd : WellData
-        WellData object
-
-    eff_metrics: efficiency_metrics
-        efficiency_metrics object
-    """
-    LOGGER.info("Computing scaling factors for efficiency metrics")
-    config = opt_model_inputs.config
-    wd = config.well_data
-    eff_metrics = wd.config.efficiency_metrics
-    eff_weights = eff_metrics.get_weights
-    set_clusters = set(wd[wd.col_names.cluster])
-    pairwise_metrics = {}
-
-    def set_scaling_factor(metric_name, scale_value):
-        """Function for logging warning message"""
-        LOGGER.warning(
-            f"Scaling factor for the efficiency metric {metric_name} is not "
-            f"provided, so it is set to {scale_value}. To modify the "
-            f"scaling factor, pass argument max_{metric_name} while instantiating "
-            f"the OptModelInputs object."
-        )
-        setattr(config, "max_" + metric_name, scale_value)
-
-    # Setting a scaling factor for num_wells metric
-    if config.max_num_wells is None and eff_weights.num_wells > 0:
-        set_scaling_factor("num_wells", 25)
-
-    # Setting a scaling factor for num_unique_owners metric
-    if config.max_num_unique_owners is None and eff_weights.num_unique_owners > 0:
-        set_scaling_factor("num_unique_owners", 5)
-
-    for metric in WELL_BASED_METRICS:
-        if (
-            getattr(eff_weights, metric, 0) > 0
-            and getattr(config, "max_" + metric) is None
-        ):
-            # Metric is chosen, but the scaling factor is not specified
-            scale_value = wd[getattr(eff_metrics, metric).data_col_name].max()
-            set_scaling_factor(metric, scale_value)
-
-    if sum(getattr(eff_weights, metric, 0) for metric in WELL_PAIR_METRICS) == 0:
-        # None of the pairwise metrics are selected, so return
-        return
-
-    # Append the pairwise metrics to the model
-    for c in set_clusters:
-        pairwise_metrics[c] = get_pairwise_metrics(
-            wd, (wd[wd.col_names.cluster] == c).index
-        )
-
-    for metric in WELL_PAIR_METRICS:
-        if (
-            getattr(eff_weights, metric, 0) > 0
-            and getattr(config, "max_" + metric) is None
-        ):
-            # Metric is chosen, but the scaling factor is not specified
-            scale_value = max(pairwise_metrics[c][metric].max() for c in set_clusters)
-            set_scaling_factor(metric, scale_value)
-    opt_model_inputs.pairwise_metrics = pairwise_metrics
 
 
 def export_data_to_excel(
