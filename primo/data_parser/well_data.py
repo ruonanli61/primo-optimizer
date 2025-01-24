@@ -620,7 +620,7 @@ class WellData:
             # Data for this column is not specified, so return
             return
 
-        LOGGER.info("Checking if age is available for all wells.")
+        LOGGER.info(f"Checking if {column} is available for all wells.")
         missing_method = getattr(self.config, "missing_" + column)
         fill_value = getattr(self.config, "fill_" + column)
         flag_col_name = column + "_flag"
