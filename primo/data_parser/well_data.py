@@ -26,7 +26,11 @@ from pyomo.common.config import Bool, document_kwargs_from_configdict
 
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics, ImpactMetrics, SetOfMetrics
-from primo.data_parser.default_data import CONVERSION_FACTOR, DAC_TRACT_YEAR
+from primo.data_parser.default_data import (
+    CONVERSION_FACTOR,
+    DAC_TRACT_YEAR,
+    MISSING_INPUT_DATA_COLUMNS,
+)
 from primo.data_parser.input_config import data_config
 from primo.data_parser.well_data_columns import WellDataColumnNames
 from primo.utils.census_utils import (
@@ -601,15 +605,22 @@ class WellData:
         )
         raise_exception(msg, NotImplementedError)
 
-    def _check_age_depth_availability(self, column):
+    def _check_input_data_availability(self, column: str):
         """
-        Checks if the age/depth of the well is available or not. If not, then
-        this method fills the missing information.
+        Checks if data in `column` is available for each well or not.
+        If not, then this method either fills the missing information or
+        removes those wells depending on the user's choice.
 
         column : str
-            Must be either "age" or "depth"
+            key name in the WellDataColumnNames object
         """
         col_name = getattr(self._col_names, column)
+
+        if col_name is None:
+            # Data for this column is not specified, so return
+            return
+
+        LOGGER.info("Checking if age is available for all wells.")
         missing_method = getattr(self.config, "missing_" + column)
         fill_value = getattr(self.config, "fill_" + column)
         flag_col_name = column + "_flag"
@@ -655,11 +666,6 @@ class WellData:
 
         self._removed_rows["production_volume"] = []
         if wcn.life_gas_production in self:
-            self.fill_incomplete_data(
-                col_name=wcn.life_gas_production,
-                value=self.config.fill_life_gas_production,
-                flag_col_name="life_gas_production_flag",
-            )
             # Remove wells if their production volume is greater than the threshold
             production_volume = self.config.threshold_gas_production
             remove_rows = self.data[
@@ -669,11 +675,6 @@ class WellData:
             self.data = self.data.drop(remove_rows)
 
         if wcn.life_oil_production in self:
-            self.fill_incomplete_data(
-                col_name=wcn.life_oil_production,
-                value=self.config.fill_life_oil_production,
-                flag_col_name="life_oil_production_flag",
-            )
             # Remove wells if their production volume is greater than the threshold
             production_volume = self.config.threshold_oil_production
             remove_rows = self.data[
@@ -697,12 +698,6 @@ class WellData:
         wt_col_name = wcn.well_type
         if wt_col_name in self:
             # Well Type is already present in the input data
-            self.fill_incomplete_data(
-                col_name=wt_col_name,
-                value=self.config.fill_well_type,
-                flag_col_name="well_type_flag",
-            )
-
             oil_wells, gas_wells = set(), set()
             for r in self:
                 if self.data.loc[r, wt_col_name].lower() in "oil":
@@ -711,7 +706,7 @@ class WellData:
                 elif self.data.loc[r, wt_col_name].lower() in "gas":
                     gas_wells.add(r)
                 elif self.data.loc[r, wt_col_name].lower() in "both":
-                    row = self.data.iloc[r]
+                    row = self.data.loc[r]
                     oil_prod = row[wcn.ann_oil_production]
                     gas_prod = row[wcn.ann_gas_production]
 
@@ -730,21 +725,7 @@ class WellData:
             self._well_types["gas"] = gas_wells
             return
 
-        # Ensure the required columns are present in the DataFrame
-        # FIXME: This value is being accepted as input at two different locations. # pylint: disable=fixme
-        #   Value-check is added in the assess_supported_metrics method for now.
         if wcn.ann_gas_production in self and wcn.ann_oil_production in self:
-            self.fill_incomplete_data(
-                wcn.ann_gas_production,
-                self.config.fill_ann_gas_production,
-                "ann_gas_production_flag",
-            )
-            self.fill_incomplete_data(
-                wcn.ann_oil_production,
-                self.config.fill_ann_oil_production,
-                "ann_oil_production_flag",
-            )
-
             # Uncomment the code to add the column to self.data (Not recommended)
             # # Convert oil production from bbl/Year to Mcf/Year using the conversion factor
             # self.data["Oil [Mcf/Year]"] = (
@@ -905,13 +886,9 @@ class WellData:
                 self.data = self.data.drop(unknown_owner)
                 self._removed_rows["unknown_owner"] = unknown_owner
 
-        # Check if age data is available, and calculate it if it is missing
-        LOGGER.info("Checking if age of all wells is available.")
-        self._check_age_depth_availability(column="age")
-
-        # Check if depth data is available, and calculate it if it is missing
-        LOGGER.info("Checking if depth of all wells is available.")
-        self._check_age_depth_availability(column="depth")
+        # Check if input data is missing
+        for col in MISSING_INPUT_DATA_COLUMNS:
+            self._check_input_data_availability(column=col)
 
         # Filter wells based on production volume
         if (
