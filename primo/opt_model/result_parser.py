@@ -310,8 +310,14 @@ class Campaign:
     Represents an optimal campaign that consists of multiple projects.
     """
 
+    # pylint: disable = too-many-arguments
     def __init__(
-        self, wd: WellData, clusters_dict: dict, plugging_cost: dict, opt_model_inputs
+        self,
+        wd: WellData,
+        clusters_dict: dict,
+        plugging_cost: dict,
+        opt_model_inputs,
+        efficiency_model_scores: Optional[dict[int, dict[str, float]]] = None,
     ):
         """
         Represents an optimal campaign that consists of multiple projects.
@@ -328,13 +334,20 @@ class Campaign:
         plugging_cost : dict
             A dictionary where keys are cluster numbers and values
             are plugging cost for that cluster
+
+        efficiency_model_scores : dict[int, dict[str, float]]
+            A dictionary where keys are cluster numbers and the values
+            are a dictionary of efficiency score names mapped to values
         """
         # for now include a pointer to well data, so that I have column names
         self.wd = wd
         self.projects = {}
         self.clusters_dict = clusters_dict
         self.opt_model_inputs = opt_model_inputs
-        compute_efficiency_scaling_factors(self.opt_model_inputs)
+
+        if efficiency_model_scores is None:
+            efficiency_model_scores = {}
+            compute_efficiency_scaling_factors(self.opt_model_inputs)
 
         index = 1
         for cluster, wells in self.clusters_dict.items():
@@ -347,7 +360,7 @@ class Campaign:
             index += 1
 
         self.num_projects = len(self.projects)
-        self.efficiency_calculator = EfficiencyCalculator(self)
+        self.efficiency_calculator = EfficiencyCalculator(self, efficiency_model_scores)
 
     def get_project_id_by_well_id(self, well_id: str) -> Optional[int]:
         """
@@ -674,7 +687,9 @@ class EfficiencyCalculator:
     A class to compute efficiency scores for projects.
     """
 
-    def __init__(self, campaign: Campaign):
+    def __init__(
+        self, campaign: Campaign, efficiency_model_scores: dict[dict[str, float]]
+    ):
         """
         Constructs the object for all of the efficiency computations for a campaign
 
@@ -684,9 +699,14 @@ class EfficiencyCalculator:
         campaign : Campaign
             The final campaign for efficiencies to be computed
 
+        efficiency_scores_dict: dict[dict[str, float]]
+            Dictionary of efficiency metrics and scores:
+            {cluster # : {efficiency_metric : efficiency score}}
+
         """
         self.campaign = campaign
         self.efficiency_weights = None
+        self.efficiency_model_scores = efficiency_model_scores
 
     def set_efficiency_weights(self, eff_metrics: EfficiencyMetrics):
         """
@@ -778,8 +798,23 @@ class EfficiencyCalculator:
         Parameters
         ----------
         project : Project
-            project in an Campaign
+            project in a Campaign
         """
+        LOGGER.info(
+            f"Computing overall efficiency score for project {project.project_id}"
+        )
+
+        if len(self.efficiency_model_scores) > 0:
+            project.update_efficiency_score(
+                sum(
+                    value
+                    for _, value in self.efficiency_model_scores[
+                        project.project_id
+                    ].items()
+                )
+            )
+            return
+
         names_attributes = [
             attribute_name
             for attribute_name in dir(project)
@@ -791,9 +826,6 @@ class EfficiencyCalculator:
                 for metric in self.efficiency_weights
                 if metric.weight != 0 and not hasattr(metric, "submetric")
             ]
-        )
-        LOGGER.info(
-            f"Computing overall efficiency score for project {project.project_id}"
         )
         for attr in names_attributes:
             project.update_efficiency_score(getattr(project, attr))
@@ -809,7 +841,8 @@ class EfficiencyCalculator:
         """
         Function that wraps all the methods needed to compute efficiency scores for the campaign
         """
-        self.compute_efficiency_attributes_for_all_projects()
+        if len(self.efficiency_model_scores) == 0:
+            self.compute_efficiency_attributes_for_all_projects()
         self.compute_overall_efficiency_scores_campaign()
 
 
