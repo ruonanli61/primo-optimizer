@@ -344,11 +344,10 @@ class Campaign:
         self.projects = {}
         self.clusters_dict = clusters_dict
         self.opt_model_inputs = opt_model_inputs
+        compute_efficiency_scaling_factors(self.opt_model_inputs)
 
         if efficiency_model_scores is None:
             efficiency_model_scores = {}
-            compute_efficiency_scaling_factors(self.opt_model_inputs)
-
         index = 1
         for cluster, wells in self.clusters_dict.items():
             self.projects[cluster] = Project(
