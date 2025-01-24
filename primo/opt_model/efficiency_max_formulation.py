@@ -17,7 +17,7 @@ import logging
 # Installed libs
 import pandas as pd
 from pyomo.core.base.block import BlockData, declare_custom_block
-from pyomo.environ import NonNegativeReals, Var
+from pyomo.environ import NonNegativeReals, Set, Var
 
 # User-defined libs
 from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
@@ -201,13 +201,16 @@ def build_cluster_efficiency_model(eff_blk):
             metric_type="well_based",
         )
 
+    pairwise_metrics = cm.parent_block().model_inputs.pairwise_metrics[cm.index()]
+    if pairwise_metrics is not None:
+        cm.set_well_pairs = Set(initialize=pairwise_metrics.index.to_list())
+
     for metric in WELL_PAIR_METRICS:
         if getattr(weights, metric, 0) == 0:
             # Metric is not selected, so skip
             continue
 
         # pylint: disable = undefined-variable
-        pairwise_metrics = cm.parent_block().model_inputs.pairwise_metrics[cm.index()]
         setattr(eff_blk, metric, MaxFormulationBlock())
         getattr(eff_blk, metric).compute_metric_score(
             weight=getattr(weights, metric),
