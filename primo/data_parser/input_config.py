@@ -71,6 +71,46 @@ def data_config() -> ConfigDict:
         ),
     )
     config.declare(
+        "missing_well_type",
+        ConfigValue(
+            default="fill",
+            domain=In(["fill", "remove"]),
+            doc="Method for processing missing well-type information",
+        ),
+    )
+    config.declare(
+        "missing_ann_gas_production",
+        ConfigValue(
+            default="fill",
+            domain=In(["fill", "remove"]),
+            doc="Method for processing missing annual gas production rate",
+        ),
+    )
+    config.declare(
+        "missing_ann_oil_production",
+        ConfigValue(
+            default="fill",
+            domain=In(["fill", "remove"]),
+            doc="Method for processing missing annual oil production rate",
+        ),
+    )
+    config.declare(
+        "missing_life_gas_production",
+        ConfigValue(
+            default="fill",
+            domain=In(["fill", "remove"]),
+            doc="Method for processing missing lifetime gas production rate",
+        ),
+    )
+    config.declare(
+        "missing_life_oil_production",
+        ConfigValue(
+            default="fill",
+            domain=In(["fill", "remove"]),
+            doc="Method for processing missing lifetime oil production rate",
+        ),
+    )
+    config.declare(
         "fill_age",
         ConfigValue(
             default=100,

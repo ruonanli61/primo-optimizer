@@ -42,6 +42,18 @@ WELL_BASED_METRICS = [
 # list of pairwise efficiency metrics accessed in the efficiency model
 WELL_PAIR_METRICS = ["age_range", "depth_range", "dist_range"]
 
+# List of columns for which the user has an option to
+# either remove/fill if the data is missing
+MISSING_INPUT_DATA_COLUMNS = [
+    "age",
+    "depth",
+    "well_type",
+    "ann_gas_production",
+    "ann_oil_production",
+    "life_gas_production",
+    "life_oil_production",
+]
+
 
 # Set of supported impact metrics along with
 # the required data for the analysis.
