@@ -313,7 +313,7 @@ class OverrideCampaign:
         """
         plugging_cost = self.feasibility.campaign_cost_dict
         wd = self.opt_inputs.config.well_data
-        return Campaign(wd, self.new_campaign, plugging_cost)
+        return Campaign(wd, self.new_campaign, plugging_cost, self.opt_inputs)
 
     def recalculate(self):
         """

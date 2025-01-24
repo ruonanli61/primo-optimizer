@@ -367,7 +367,7 @@ class PluggingCampaignModel(ConcreteModel):
         )
         if model_inputs.config.objective_weight_impact < 100:
             if model_inputs.config.efficiency_formulation == "Max Scaling":
-                compute_efficiency_scaling_factors(self)
+                compute_efficiency_scaling_factors(model_inputs)
             for c in self.set_clusters:
                 self.cluster[c].efficiency_model = EfficiencyBlock()
                 self.cluster[c].efficiency_model.build_efficiency_model(
@@ -586,7 +586,13 @@ class PluggingCampaignModel(ConcreteModel):
                 )
 
         wd = self.model_inputs.config.well_data
-        return Campaign(wd, optimal_campaign, plugging_cost, efficiency_scores_projects)
+        return Campaign(
+            wd,
+            optimal_campaign,
+            plugging_cost,
+            self.model_inputs,
+            efficiency_scores_projects,
+        )
 
     def get_solution_pool(self, solver):
         """
@@ -633,6 +639,7 @@ class PluggingCampaignModel(ConcreteModel):
                 wd=self.model_inputs.config.well_data,
                 clusters_dict=optimal_campaign,
                 plugging_cost=plugging_cost,
+                opt_model_inputs=self.model_inputs,
             )
 
         return solution_pool

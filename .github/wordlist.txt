@@ -63,6 +63,7 @@ fixme
 geopandas
 geopoint
 geospatial
+getattr
 glpk
 gpd
 gurobi
@@ -93,6 +94,7 @@ pyomo
 quickstart
 scikit
 scip
+setattr
 shapefile
 shapefiles
 stacktrace

@@ -389,6 +389,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         # NOTE: Attributes _opt_model and _solver are defined in
         # build_optimization_model and solve_model methods, respectively.
+        self.pairwise_metrics = {c: None for c in self.campaign_candidates}
         self._opt_model = None
         self._solver = None
         LOGGER.info("Finished processing optimization model inputs.")

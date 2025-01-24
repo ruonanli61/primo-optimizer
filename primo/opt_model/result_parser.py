@@ -23,7 +23,10 @@ import pandas as pd
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics
 from primo.data_parser.well_data import WellData
-from primo.utils.kpi_utils import calculate_average
+from primo.opt_model.efficiency_max_formulation import (
+    compute_efficiency_scaling_factors,
+)
+from primo.utils.clustering_utils import distance_matrix
 
 LOGGER = logging.getLogger(__name__)
 
@@ -135,6 +138,14 @@ class Project:
         )
 
     @property
+    def dist_range(self):
+        """
+        Returns the range of the distance of the project
+        """
+        dist_matrix = distance_matrix(self.well_data, {"distance": 1})
+        return dist_matrix.max().max()
+
+    @property
     def average_depth(self):
         """
         Returns the average depth of the project
@@ -158,11 +169,7 @@ class Project:
         """
         col_name = self._col_names.elevation_delta
         self._check_column_exists(col_name)
-        return calculate_average(
-            self.well_data.data,
-            self._col_names.elevation_delta,
-            estimation_method="yes",
-        )
+        return self.well_data[col_name].max()
 
     @property
     def centroid(self):
@@ -188,7 +195,7 @@ class Project:
         """
         col_name = self._col_names.dist_to_road
         self._check_column_exists(col_name)
-        return calculate_average(self.well_data.data, self._col_names.dist_to_road)
+        return self.well_data[col_name].max()
 
     @property
     def population_density(self):
@@ -197,9 +204,7 @@ class Project:
         """
         col_name = self._col_names.population_density
         self._check_column_exists(col_name)
-        return calculate_average(
-            self.well_data.data, self._col_names.population_density
-        )
+        return self.well_data[col_name].max()
 
     @property
     def column_names(self):
@@ -305,11 +310,13 @@ class Campaign:
     Represents an optimal campaign that consists of multiple projects.
     """
 
+    # pylint: disable = too-many-arguments
     def __init__(
         self,
         wd: WellData,
         clusters_dict: dict,
         plugging_cost: dict,
+        opt_model_inputs,
         efficiency_model_scores: Optional[dict[int, dict[str, float]]] = None,
     ):
         """
@@ -336,10 +343,12 @@ class Campaign:
         self.wd = wd
         self.projects = {}
         self.clusters_dict = clusters_dict
+        self.opt_model_inputs = opt_model_inputs
+        if opt_model_inputs.config.well_data.config.efficiency_metrics is not None:
+            compute_efficiency_scaling_factors(self.opt_model_inputs)
 
         if efficiency_model_scores is None:
             efficiency_model_scores = {}
-
         index = 1
         for cluster, wells in self.clusters_dict.items():
             self.projects[cluster] = Project(
@@ -736,67 +745,51 @@ class EfficiencyCalculator:
                 f"Computing scores for metric/submetric {metric.name}/{metric.full_name}."
             )
 
-            if metric.name == "num_unique_owners":
-                metric.data_col_name = metric.name
-                max_value = self.campaign.get_max_value_across_all_projects(metric.name)
-                min_value = 1
-            elif metric.name == "num_wells":
-                metric.data_col_name = metric.name
-                max_value = self.campaign.get_max_value_across_all_projects(metric.name)
-                min_value = 1
-            else:
-                max_value = self.campaign.get_max_value_across_all_wells(
-                    metric.data_col_name
-                )
-                min_value = self.campaign.get_min_value_across_all_wells(
-                    metric.data_col_name
-                )
+            scaling_factor = getattr(
+                self.campaign.opt_model_inputs.config, "max_" + metric.name
+            )
 
             assert getattr(project, metric.score_attribute, None) is None
-            # assert hasattr(project, metric.name)
+            score = (
+                1 - getattr(project, metric.name) / scaling_factor
+            ) * metric.effective_weight
+            setattr(
+                project,
+                metric.score_attribute,
+                min(max(score, 0), metric.effective_weight),
+            )
+            # if metric.has_inverse_priority:
+            #     setattr(
+            #         project,
+            #         metric.score_attribute,
+            #         (1 - getattr(project, metric.name) / scaling_factor)* metric.effective_weight,
+            #         max(
+            #             0,
+            #             min(
+            #                 1,
+            #                 (
+            #                     (max_value - getattr(project, metric.name))
+            #                     / (max_value - min_value)
+            #                 ),
+            #             ),
+            #         )
+            #         * metric.effective_weight,
+            #     )
 
-            # Check if division by a zero is likely
-            if np.isclose(max_value, min_value, rtol=0.001):
-                # All cells in this column have equal value.
-                # To avoid division by zero, set min_value = 0
-                min_value = 0
-
-            if np.isclose(max_value, 0, rtol=0.001):
-                # All values in this column are likely zeros.
-                # To avoid division by zero, set max_value = 1
-                max_value = 1.0
-
-            if metric.has_inverse_priority:
-                setattr(
-                    project,
-                    metric.score_attribute,
-                    max(
-                        0,
-                        min(
-                            1,
-                            (
-                                (max_value - getattr(project, metric.name))
-                                / (max_value - min_value)
-                            ),
-                        ),
-                    )
-                    * metric.effective_weight,
-                )
-
-            else:
-                setattr(
-                    project,
-                    metric.score_attribute,
-                    max(
-                        0,
-                        min(
-                            1,
-                            (getattr(project, metric.name) - min_value)
-                            / (max_value - min_value),
-                        ),
-                    )
-                    * metric.effective_weight,
-                )
+            # else:
+            #     setattr(
+            #         project,
+            #         metric.score_attribute,
+            #         max(
+            #             0,
+            #             min(
+            #                 1,
+            #                 (getattr(project, metric.name) - min_value)
+            #                 / (max_value - min_value),
+            #             ),
+            #         )
+            #         * metric.effective_weight,
+            #     )
 
     def compute_overall_efficiency_scores_project(self, project: Project):
         """
