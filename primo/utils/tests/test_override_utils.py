@@ -161,14 +161,14 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
     assert hasattr(override_campaign, "compute_efficiency_scores")
     project = override_campaign.projects[1]
     assert np.isclose(project.impact_score, 68.88, rtol=1e-2, atol=1e-2)
-    assert np.isclose(project.efficiency_score, 32.006, rtol=1e-2, atol=1e-2)
+    assert np.isclose(project.efficiency_score, 8.802, rtol=1e-2, atol=1e-2)
     assert len(override_campaign.wd) == len(opt_mdl_inputs.config.well_data)
 
     override_campaign_dict = or_camp_class.recalculate_scores()
     assert isinstance(override_campaign_dict, dict)
     assert 13 not in override_campaign_dict
     assert all(
-        [63.55375464985779, 46.03383590762232][i]
+        [63.55375464985779, 34.85663000030149][i]
         == pytest.approx(override_campaign_dict[11][i], rel=1e-2)
         for i in range(2)
     )

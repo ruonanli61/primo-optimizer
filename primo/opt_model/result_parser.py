@@ -344,7 +344,8 @@ class Campaign:
         self.projects = {}
         self.clusters_dict = clusters_dict
         self.opt_model_inputs = opt_model_inputs
-        compute_efficiency_scaling_factors(self.opt_model_inputs)
+        if opt_model_inputs.config.well_data.config.efficiency_metrics is not None:
+            compute_efficiency_scaling_factors(self.opt_model_inputs)
 
         if efficiency_model_scores is None:
             efficiency_model_scores = {}
