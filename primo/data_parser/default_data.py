@@ -360,6 +360,7 @@ SUPP_EFF_METRICS = {
         name="dist_range",
         full_name="Distance Range [miles]",
         has_inverse_priority=True,
+        required_data="latitude",
     ),
     "record_completeness": _SupportedContent(
         name="record_completeness",

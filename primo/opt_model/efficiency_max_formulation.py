@@ -71,7 +71,7 @@ class MaxFormulationBlockData(BlockData):
 
             @self.Constraint(self.cluster_model.set_well_pairs)
             def calculate_score(blk, w1, w2):
-                return select_cluster - blk.score / weight <= (
+                return select_cluster - blk.score / weight >= (
                     norm_metric_data[w1, w2]
                     * (well_vars[w1] + well_vars[w2] - select_cluster)
                 )

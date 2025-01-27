@@ -31,7 +31,7 @@ from pyomo.environ import (
 )
 
 # User-defined libs
-# pylint: disable=no-name-in-module
+# pylint: disable=no-name-in-module, import-error
 from primo.opt_model.efficiency_block import EfficiencyBlock
 from primo.opt_model.result_parser import Campaign
 
@@ -51,9 +51,12 @@ def build_cluster_model(model_block, cluster):
     # Get well pairs which violate the distance threshold
     well_dac = []
     # Update the column name after federal DAC info is added
-    if "is_disadvantaged" in wd:
+    # NOTE: Ignoring federal DAC information, and assuming that the
+    # state DAC information is boolean-type
+    state_dac_col = wd.column_names.state_dac
+    if state_dac_col in wd:
         for well in well_index:
-            if wd.data.loc[well, "is_disadvantaged"]:
+            if wd.data.loc[well, state_dac_col] == 1:
                 well_dac.append(well)
 
     # Essential model sets
