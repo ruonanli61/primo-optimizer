@@ -188,31 +188,59 @@ def data_config() -> ConfigDict:
             ),
         ),
     )
+
     config.declare(
-        "threshold_gas_production",
+        "min_lifetime_gas_production",
         ConfigValue(
             domain=NonNegativeFloat,
             doc=(
-                "If specified, wells whose lifelong gas production volume [in Mcf] is "
-                "above the threshold production volume will be removed from the dataset"
+                "The minimum gas production over lifetime (in MCF) to consider a well"
+                " eligible for plugging"
             ),
         ),
     )
+
     config.declare(
-        "threshold_oil_production",
+        "max_lifetime_gas_production",
         ConfigValue(
             domain=NonNegativeFloat,
             doc=(
-                "If specified, wells whose lifelong oil production volume [in bbl] is "
-                "above the threshold production volume will be removed from the dataset"
+                "The maximum gas production over lifetime (in MCF) to consider a well"
+                " eligible for plugging"
             ),
         ),
     )
+
     config.declare(
-        "threshold_depth",
+        "min_lifetime_oil_production",
         ConfigValue(
             domain=NonNegativeFloat,
-            doc="Threshold depth [in ft] for classifying a well as shallow or deep",
+            doc=(
+                "The minimum oil production over lifetime (in Bbl) to consider a well"
+                " eligible for plugging"
+            ),
+        ),
+    )
+
+    config.declare(
+        "max_lifetime_oil_production",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc=(
+                "The maximum oil production over lifetime (in Bbl) to consider a well"
+                " eligible for plugging"
+            ),
+        ),
+    )
+
+    config.declare(
+        "well_depth_limit",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc=(
+                "The cutoff depth (in feet) for a well to be considered shallow. "
+                "Wells larger in depth are considered 'deep'"
+            ),
         ),
     )
     config.declare(

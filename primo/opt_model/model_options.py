@@ -74,8 +74,48 @@ def model_config() -> ConfigDict:
         ),
     )
 
-    # Model type and model nature options
+    config.declare(
+        "shallow_gas_well_cost",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Cost of plugging a single shallow gas well in $",
+        ),
+    )
 
+    config.declare(
+        "deep_gas_well_cost",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Cost of plugging a single deep gas well in $",
+        ),
+    )
+
+    config.declare(
+        "shallow_oil_well_cost",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Cost of plugging a single shallow oil well in $",
+        ),
+    )
+
+    config.declare(
+        "deep_oil_well_cost",
+        ConfigValue(
+            domain=NonNegativeFloat,
+            doc="Cost of plugging a single deep oil well in $",
+        ),
+    )
+
+    config.declare(
+        "beta",
+        ConfigValue(
+            domain=InRange(0, 1),
+            doc="Parameter that defines economies of scale "
+            "when plugging multiple wells",
+        ),
+    )
+
+    # Model type and model nature options
     config.declare(
         "efficiency_formulation",
         ConfigValue(

@@ -272,7 +272,7 @@ class WellData:
 
         LOGGER.warning(
             "Insufficient information for well categorization. Either specify "
-            "well_type_by_depth in the input data, or specify threshold_depth "
+            "well_type_by_depth in the input data, or specify well_depth_limit "
             "while instantiating the WellData object."
         )
 
@@ -651,7 +651,8 @@ class WellData:
         """
         Removes wells whose lifelong production volume is greater
         than a threshold value. The threshold value for gas and oil can be specified
-        via threshold_gas_production and threshold_oil_production arguments
+        via min_lifetime_oil_production, max_lifetime_oil_production,
+        min_lifetime_gas_production, max_lifetime_gas_production arguments
         while instantiating the WellData object
         """
         wcn = self._col_names
@@ -664,26 +665,47 @@ class WellData:
             )
             return
 
-        self._removed_rows["production_volume"] = []
+        remove_rows = []
         if wcn.life_gas_production in self:
-            # Remove wells if their production volume is greater than the threshold
-            production_volume = self.config.threshold_gas_production
-            remove_rows = self.data[
-                self.data[wcn.life_gas_production] >= production_volume
-            ].index
-            self._removed_rows["production_volume"] += list(remove_rows)
-            self.data = self.data.drop(remove_rows)
+            # Remove wells if their production volume is outside desired range
+            min_production_volume = self.config.min_lifetime_gas_production
+            max_production_volume = self.config.max_lifetime_gas_production
+            if min_production_volume is not None:
+                remove_rows += list(
+                    self.data[
+                        self.data[wcn.life_gas_production] <= min_production_volume
+                    ].index
+                )
+
+            if max_production_volume is not None:
+                remove_rows += list(
+                    self.data[
+                        self.data[wcn.life_gas_production] >= max_production_volume
+                    ].index
+                )
 
         if wcn.life_oil_production in self:
-            # Remove wells if their production volume is greater than the threshold
-            production_volume = self.config.threshold_oil_production
-            remove_rows = self.data[
-                self.data[wcn.life_oil_production] >= production_volume
-            ].index
-            self._removed_rows["production_volume"] += list(remove_rows)
-            self.data = self.data.drop(remove_rows)
+            # Remove wells if their production volume is outside desired range
+            min_production_volume = self.config.min_lifetime_oil_production
+            max_production_volume = self.config.max_lifetime_oil_production
+            if min_production_volume is not None:
+                remove_rows += list(
+                    self.data[
+                        self.data[wcn.life_oil_production] <= min_production_volume
+                    ].index
+                )
+
+            if max_production_volume is not None:
+                remove_rows += list(
+                    self.data[
+                        self.data[wcn.life_oil_production] >= max_production_volume
+                    ].index
+                )
+
+        self._removed_rows["production_volume"] = remove_rows
 
         if len(self._removed_rows["production_volume"]) > 0:
+            self.data = self.data.drop(remove_rows)
             LOGGER.warning(
                 "Some wells have been removed based on the lifelong production volume."
             )
@@ -760,7 +782,7 @@ class WellData:
         """
         depth_col_name = self._col_names.depth
         wt_col_name = self._col_names.well_type_by_depth
-        threshold_depth = self.config.threshold_depth
+        well_depth_limit = self.config.well_depth_limit
 
         if wt_col_name in self:
             # Information is already provided. Fill empty cells.
@@ -788,8 +810,8 @@ class WellData:
             self._well_types["shallow"] = shallow_wells
             return
 
-        if threshold_depth is not None:
-            # Well-type is not specified, but the threshold depth is specified.
+        if well_depth_limit is not None:
+            # Well-type is not specified, but the well depth limit is specified.
             # Classifying wells based on this information.
             # Depth information has already been processed, so there will not be
             # any incomplete cells in this column
@@ -799,12 +821,12 @@ class WellData:
             # self._col_names.well_type_by_depth = wt_col_name
             # self.data[wt_col_name] = self.data.apply(
             #     lambda row: (
-            #         "Deep" if row[depth_col_name] > threshold_depth else "Shallow"
+            #         "Deep" if row[depth_col_name] > well_depth_limit else "Shallow"
             #     ),
             #     axis=1,
             # )
             self._well_types["deep"] = set(
-                self.data[self.data[depth_col_name] >= threshold_depth].index
+                self.data[self.data[depth_col_name] >= well_depth_limit].index
             )
             self._well_types["shallow"] = (
                 set(self.data.index) - self._well_types["deep"]
@@ -891,9 +913,14 @@ class WellData:
             self._check_input_data_availability(column=col)
 
         # Filter wells based on production volume
-        if (
-            self.config.threshold_gas_production is not None
-            or self.config.threshold_oil_production is not None
+        if any(
+            opt is not None
+            for opt in (
+                self.config.min_lifetime_oil_production,
+                self.config.max_lifetime_oil_production,
+                self.config.min_lifetime_gas_production,
+                self.config.max_lifetime_gas_production,
+            )
         ):
             self._filter_production_volume()
 

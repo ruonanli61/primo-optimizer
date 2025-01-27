@@ -141,8 +141,10 @@ def test_dac_score(get_column_names, get_random_generator, get_random_lat_long_b
         fill_depth=999,
         fill_life_gas_production=1.5,
         fill_life_oil_production=1.5,
-        threshold_gas_production=2,
-        threshold_oil_production=2,
+        min_lifetime_oil_production=0,
+        max_lifetime_oil_production=2,
+        min_lifetime_gas_production=0,
+        max_lifetime_gas_production=2,
         impact_metrics=im_metrics,
     )
     with pytest.raises(
@@ -163,8 +165,10 @@ def test_dac_score(get_column_names, get_random_generator, get_random_lat_long_b
         fill_depth=999,
         fill_life_gas_production=1.5,
         fill_life_oil_production=1.5,
-        threshold_gas_production=2,
-        threshold_oil_production=2,
+        min_lifetime_oil_production=0,
+        max_lifetime_oil_production=2,
+        min_lifetime_gas_production=0,
+        max_lifetime_gas_production=2,
         impact_metrics=im_metrics,
     )
     wd.compute_priority_scores()
@@ -181,9 +185,11 @@ def test_well_data(caplog, get_column_names):
         fill_depth=999,
         fill_life_gas_production=1.5,
         fill_life_oil_production=1.5,
-        threshold_gas_production=2,
-        threshold_oil_production=2,
-        threshold_depth=2000,
+        min_lifetime_oil_production=0,
+        max_lifetime_oil_production=2,
+        min_lifetime_gas_production=0,
+        max_lifetime_gas_production=2,
+        well_depth_limit=2000,
     )
 
     # Test column_names alias
@@ -333,8 +339,10 @@ def test_no_warnings(caplog, get_column_names):
         fill_depth=999,
         fill_life_gas_production=1.5,
         fill_life_oil_production=1.5,
-        threshold_gas_production=2,
-        threshold_oil_production=2,
+        min_lifetime_oil_production=0,
+        max_lifetime_oil_production=2,
+        min_lifetime_gas_production=0,
+        max_lifetime_gas_production=2,
     )
 
     # Check no warning messages related to empty are printed
@@ -370,7 +378,7 @@ def test_no_warnings(caplog, get_column_names):
     assert wd.get_shallow_deep_wells is None
     assert (
         "Insufficient information for well categorization. Either specify "
-        "well_type_by_depth in the input data, or specify threshold_depth "
+        "well_type_by_depth in the input data, or specify well_depth_limit "
         "while instantiating the WellData object."
     ) in caplog.text
 
@@ -650,8 +658,10 @@ def test_compute_priority_scores(
         fill_depth=999,
         fill_life_gas_production=1.5,
         fill_life_oil_production=1.5,
-        threshold_gas_production=2,
-        threshold_oil_production=2,
+        min_lifetime_oil_production=0,
+        max_lifetime_oil_production=2,
+        min_lifetime_gas_production=0,
+        max_lifetime_gas_production=2,
         impact_metrics=im_metrics,
     )
 
