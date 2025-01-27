@@ -15,6 +15,7 @@
 import logging
 
 # Installed libs
+import numpy as np
 from pyomo.common.config import (
     Bool,
     ConfigDict,
@@ -27,10 +28,12 @@ from pyomo.common.config import (
 )
 
 # User-defined libs
+from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
 from primo.data_parser.well_data import WellData
 from primo.opt_model.model_with_clustering import PluggingCampaignModel
 from primo.utils import get_solver
 from primo.utils.clustering_utils import (
+    get_pairwise_metrics,
     perform_agglomerative_clustering,
     perform_louvain_clustering,
 )
@@ -557,3 +560,105 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         wd.add_new_column_ordered(
             "record_completeness", "Fraction Data Incomplete", data / num_columns
         )
+
+    def compute_efficiency_scaling_factors(self):
+        """
+        Checks whether scaling factors for efficiency metrics are provided by
+        the user or not. If not, computes the scaling factors using the entire
+        dataset.
+
+        Parameters
+        ----------
+        self : OptModelInputs
+            OptModelInputs object
+        """
+        LOGGER.info("Computing scaling factors for efficiency metrics")
+        config = self.config
+        wd = config.well_data
+        eff_metrics = wd.config.efficiency_metrics
+        eff_weights = eff_metrics.get_weights
+
+        def set_scaling_factor(metric_name, scale_value):
+            """Function for logging warning message"""
+            LOGGER.warning(
+                f"Scaling factor for the efficiency metric {metric_name} is not "
+                f"provided, so it is set to {scale_value}. To modify the "
+                f"scaling factor, pass argument max_{metric_name} while instantiating "
+                f"the OptModelInputs object."
+            )
+            setattr(config, "max_" + metric_name, scale_value)
+
+        # Setting a scaling factor for num_wells metric
+        if config.max_num_wells is None and eff_weights.num_wells > 0:
+            set_scaling_factor("num_wells", 25)
+
+        # Setting a scaling factor for num_unique_owners metric
+        if config.max_num_unique_owners is None and eff_weights.num_unique_owners > 0:
+            set_scaling_factor("num_unique_owners", 5)
+
+        for metric in WELL_BASED_METRICS:
+            if (
+                getattr(eff_weights, metric, 0) > 0
+                and getattr(config, "max_" + metric) is None
+            ):
+                # Metric is chosen, but the scaling factor is not specified
+                scale_value = wd[getattr(eff_metrics, metric).data_col_name].max()
+                if np.isclose(scale_value, 0):
+                    LOGGER.warning(
+                        f"Scaling factor for {metric} is close to 0. Setting it to 1."
+                    )
+                    scale_value = 1
+                set_scaling_factor(metric, scale_value)
+
+        if sum(getattr(eff_weights, metric, 0) for metric in WELL_PAIR_METRICS) == 0:
+            # None of the pairwise metrics are selected, so return
+            return
+
+        # Append the pairwise metrics to the model
+        for c in self.campaign_candidates:
+            self.pairwise_metrics[c] = get_pairwise_metrics(
+                wd, self.campaign_candidates[c]
+            )
+
+        for metric in WELL_PAIR_METRICS:
+            if (
+                getattr(eff_weights, metric, 0) > 0
+                and getattr(config, "max_" + metric) is None
+            ):
+                # Metric is chosen, but the scaling factor is not specified
+                scale_value = max(
+                    self.pairwise_metrics[c][metric].max()
+                    for c in self.campaign_candidates
+                )
+                if np.isclose(scale_value, 0):
+                    LOGGER.warning(
+                        f"Scaling factor for {metric} is close to 0. Setting it to 1."
+                    )
+                    scale_value = 1
+                set_scaling_factor(metric, scale_value)
+
+    def has_efficiency_scaling_factors(self):
+        """
+        checks if all efficiency metrics have scaling factors
+
+        Parameters
+        ----------
+        self : OptModelInputs
+            OptModelInputs object
+
+        Returns
+        ----------
+        Bool : False if scaling factor for any metric does not exist, True otherwise
+        """
+        config = self.config
+        wd = config.well_data
+        eff_metrics = wd.config.efficiency_metrics
+        for metric in eff_metrics:
+            if (
+                metric.effective_weight > 0
+                and getattr(config, "max_" + metric.name) is not None
+            ):
+                pass
+            else:
+                return False
+        return True

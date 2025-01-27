@@ -22,9 +22,6 @@ import pytest
 from primo.data_parser import WellDataColumnNames
 from primo.data_parser.metric_data import EfficiencyMetrics, ImpactMetrics
 from primo.data_parser.well_data import WellData
-from primo.opt_model.efficiency_max_formulation import (
-    compute_efficiency_scaling_factors,
-)
 from primo.opt_model.model_options import OptModelInputs
 from primo.opt_model.result_parser import Campaign, export_data_to_excel
 
@@ -519,7 +516,7 @@ def test_compute_accessibility_score(get_campaign, get_eff_metrics_accessibility
         efficiency_metrics=get_eff_metrics_accessibility
     )
     get_campaign.set_efficiency_weights(get_eff_metrics_accessibility)
-    compute_efficiency_scaling_factors(get_campaign.opt_model_inputs)
+    get_campaign.opt_model_inputs.compute_efficiency_scaling_factors()
     get_campaign.efficiency_calculator.compute_efficiency_scores()
     project = get_campaign.projects[2]
     assert project.accessibility_score == (
@@ -537,7 +534,7 @@ def test_compute_accessibility_score_2(get_campaign, get_eff_metrics):
         efficiency_metrics=get_eff_metrics
     )
     get_campaign.set_efficiency_weights(get_eff_metrics)
-    compute_efficiency_scaling_factors(get_campaign.opt_model_inputs)
+    get_campaign.opt_model_inputs.compute_efficiency_scaling_factors()
     get_campaign.efficiency_calculator.compute_efficiency_scores()
     project = get_campaign.projects[2]
     assert project.accessibility_score == (20, pytest.approx(13.333333))

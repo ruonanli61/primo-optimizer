@@ -1016,6 +1016,15 @@ class WellData:
                 )
                 raise_exception(msg, ValueError)
 
+            if self.data[metric.data_col_name].isna().all():
+                raise_exception(
+                    f"Weight associated with {metric.name} is non-zero."
+                    "The data column provided for this metric is empty."
+                    "Either change the metric weight to 0 or"
+                    "provide a non-empty data column for the metric",
+                    ValueError,
+                )
+
             # check incomplete data
             self.fill_incomplete_data(
                 col_name=metric.data_col_name,

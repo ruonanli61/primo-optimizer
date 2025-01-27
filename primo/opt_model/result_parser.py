@@ -23,9 +23,6 @@ import pandas as pd
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics
 from primo.data_parser.well_data import WellData
-from primo.opt_model.efficiency_max_formulation import (
-    compute_efficiency_scaling_factors,
-)
 from primo.utils.clustering_utils import distance_matrix
 
 LOGGER = logging.getLogger(__name__)
@@ -345,7 +342,7 @@ class Campaign:
         self.clusters_dict = clusters_dict
         self.opt_model_inputs = opt_model_inputs
         if opt_model_inputs.config.well_data.config.efficiency_metrics is not None:
-            compute_efficiency_scaling_factors(self.opt_model_inputs)
+            self.opt_model_inputs.compute_efficiency_scaling_factors()
 
         if efficiency_model_scores is None:
             efficiency_model_scores = {}

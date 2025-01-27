@@ -33,9 +33,6 @@ from pyomo.environ import (
 # User-defined libs
 # pylint: disable=no-name-in-module
 from primo.opt_model.efficiency_block import EfficiencyBlock
-from primo.opt_model.efficiency_max_formulation import (
-    compute_efficiency_scaling_factors,
-)
 from primo.opt_model.result_parser import Campaign
 
 LOGGER = logging.getLogger(__name__)
@@ -367,7 +364,7 @@ class PluggingCampaignModel(ConcreteModel):
         )
         if model_inputs.config.objective_weight_impact < 100:
             if model_inputs.config.efficiency_formulation == "Max Scaling":
-                compute_efficiency_scaling_factors(model_inputs)
+                model_inputs.compute_efficiency_scaling_factors()
             for c in self.set_clusters:
                 self.cluster[c].efficiency_model = EfficiencyBlock()
                 self.cluster[c].efficiency_model.build_efficiency_model(
