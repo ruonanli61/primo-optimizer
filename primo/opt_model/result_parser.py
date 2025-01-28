@@ -747,9 +747,14 @@ class EfficiencyCalculator:
             )
 
             assert getattr(project, metric.score_attribute, None) is None
-            score = (
-                1 - getattr(project, metric.name) / scaling_factor
-            ) * metric.effective_weight
+            if metric.name == "num_wells":
+                score = (
+                    getattr(project, metric.name) / scaling_factor
+                ) * metric.effective_weight
+            else:
+                score = (
+                    1 - getattr(project, metric.name) / scaling_factor
+                ) * metric.effective_weight
             setattr(
                 project,
                 metric.score_attribute,

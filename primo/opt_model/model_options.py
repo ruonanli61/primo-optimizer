@@ -590,6 +590,8 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
 
         # Setting a scaling factor for num_wells metric
         if config.max_num_wells is None and eff_weights.num_wells > 0:
+            if config.max_wells_in_project is not None:
+                config.max_num_wells = config.max_wells_in_project
             set_scaling_factor("num_wells", 25)
 
         # Setting a scaling factor for num_unique_owners metric
@@ -656,9 +658,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         for metric in eff_metrics:
             if (
                 metric.effective_weight > 0
-                and getattr(config, "max_" + metric.name) is not None
+                and getattr(config, "max_" + metric.name) is None
             ):
-                pass
-            else:
                 return False
         return True

@@ -703,7 +703,7 @@ def test_single_well(get_minimal_campaign, get_eff_metrics_simple):
     )
     get_minimal_campaign.set_efficiency_weights(get_eff_metrics_simple)
     get_minimal_campaign.efficiency_calculator.compute_efficiency_scores()
-    assert get_minimal_campaign.projects[3].efficiency_score == 93.2
+    assert get_minimal_campaign.projects[3].efficiency_score == 74.8
 
 
 def test_zeros(get_minimal_campaign, get_efficiency_metrics_minimal):
@@ -725,7 +725,7 @@ def test_compute_efficiency_attributes_for_project(get_efficiency_calculator):
     campaign = get_efficiency_calculator
     project = campaign.projects[2]
     campaign.efficiency_calculator.compute_efficiency_attributes_for_project(project)
-    assert project.num_wells_eff_score_0_20 == pytest.approx(18.4)
+    assert project.num_wells_eff_score_0_20 == pytest.approx(1.6)
     assert project.num_unique_owners_eff_score_0_30 == pytest.approx(18)
     assert project.elevation_delta_eff_score_0_20 == pytest.approx(13.33333)
     assert project.age_range_eff_score_0_10 == pytest.approx(6.666666)
@@ -737,7 +737,7 @@ def test_compute_overall_efficiency_scores_project(get_efficiency_calculator):
     project = campaign.projects[2]
     campaign.efficiency_calculator.compute_efficiency_attributes_for_project(project)
     campaign.efficiency_calculator.compute_overall_efficiency_scores_project(project)
-    assert project.efficiency_score == pytest.approx(69.7333)
+    assert project.efficiency_score == pytest.approx(52.9333)
 
 
 def test_compute_efficiency_attributes_for_all_projects(get_efficiency_calculator):
@@ -797,7 +797,7 @@ def test_get_efficiency_metrics(get_efficiency_calculator):
     assert all(
         list(efficiency_metric_output.iloc[0, :].values)[i]
         == pytest.approx(
-            [2, 6.666666, 13.33333, 13.333333, 18, 18.4, 13.333333, 69.73][i]
+            [2, 6.666666, 13.333333, 13.333333, 18.0, 1.6, 13.333333, 52.93][i]
         )
         for i in range(7)
     )
@@ -819,7 +819,7 @@ def test_get_efficiency_metrics(get_efficiency_calculator):
     )
     assert all(
         list(efficiency_metric_output.iloc[0, :].values)[i]
-        == pytest.approx([2, 6.666666, 13.33333, 18, 18.4, 13.333333, 69.73][i])
+        == pytest.approx([2, 6.666666, 13.33333, 18, 1.6, 13.333333, 52.93][i])
         for i in range(5)
     )
 
