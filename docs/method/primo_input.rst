@@ -82,5 +82,3 @@ Provide Inputs Using Config File
 -----------------------------------
 Currently, PRIMO includes typical priority metrics, efficiency metrics, and constraints by default. If more metrics or constraints are
 needed, users will have to modify the :doc:`config file <config_file>`.
-
-

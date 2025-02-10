@@ -1,6 +1,6 @@
 """
-These checks are used by stagedfright to determine whether a staged file is cleared for commit 
-or not. The check suite should be optimized and optimized based on the features of the specific 
+These checks are used by stagedfright to determine whether a staged file is cleared for commit
+or not. The check suite should be optimized and optimized based on the features of the specific
 sensitive data formats and features being handled.
 For more information, see the README.md file in this directory.
 """

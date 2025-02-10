@@ -1046,6 +1046,13 @@ class WellData:
                 )
                 raise_exception(msg, ValueError)
 
+            # For elevation_delta, convert the data to absolute values
+            if metric.name == "elevation_delta":
+                LOGGER.warning(
+                    "Converting negative elevation delta values to positive."
+                )
+                self.data[metric.data_col_name] = self.data[metric.data_col_name].abs()
+
     def _process_dac_data(self):
         """
         processes the DAC data

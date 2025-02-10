@@ -14,9 +14,9 @@
 """
 GitHub secrets are not passed to PRs: Therefore all tests that rely on secrets
 must be turned off when Actions are run for an incoming PR. This in turn leads to
-codecov complaining about reduced coverage with a patch. 
+codecov complaining about reduced coverage with a patch.
 
-Thus all tests that rely on secrets are implemented in this single file which is 
+Thus all tests that rely on secrets are implemented in this single file which is
 ignored for codecov analysis by suitably setting ignore paths in codecov.yml
 """
 

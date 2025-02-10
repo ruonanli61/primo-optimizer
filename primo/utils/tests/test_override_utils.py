@@ -168,7 +168,7 @@ def test_infeasible_override_campaign(or_infeasible_selection, get_model):
     assert isinstance(override_campaign_dict, dict)
     assert 13 not in override_campaign_dict
     assert 63.55375464985779 == pytest.approx(override_campaign_dict[11][0], rel=1e-2)
-    assert 29.25663000030148 == pytest.approx(override_campaign_dict[11][1], rel=1e-2)
+    assert 19.69807578343402 == pytest.approx(override_campaign_dict[11][1], rel=1e-2)
 
     override_cluster_dict, override_well_dict = or_camp_class.re_optimize_dict()
     assert override_cluster_dict == {19: 1}
