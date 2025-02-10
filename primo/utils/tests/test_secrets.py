@@ -12,14 +12,14 @@
 #################################################################################
 
 """
-GitHub secrets are not passed to PRs: Therefore all tests that rely on secrets
+GitHub secrets are not passed to pull requests: Therefore all tests that rely on secrets
 must be turned off when Actions are run for an incoming PR. This in turn leads to
 codecov complaining about reduced coverage with a patch.
 
 Thus all tests that rely on secrets are implemented in this single file which is
 ignored for codecov analysis by suitably setting ignore paths in codecov.yml
 """
-
+# pylint: disable=missing-function-docstring
 # Installed libs
 import numpy as np
 import pytest
@@ -39,6 +39,7 @@ STATE_CODE = 37
 STATE_CODE_FAKE = 60
 
 
+# pylint: disable=protected-access
 @pytest.mark.secrets
 def test_generate_geo_identifiers():
     census_key = get_census_key()

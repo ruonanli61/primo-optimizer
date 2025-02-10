@@ -183,23 +183,23 @@ class WellData:
 
     def _repr_html_(self):
         """Nicely formats the data in Jupyter notebook"""
-        # Printing columns of interest, if they exist
-        cn = self._col_names
-        cols = [
-            col
-            for col in [
-                cn.well_id,
-                cn.operator_name,
-                cn.latitude,
-                cn.longitude,
-                cn.age,
-                cn.depth,
-            ]
-            if col is not None
-        ] + self.get_priority_score_columns
-
         # pylint: disable = protected-access
-        return self.data[cols]._repr_html_()
+        return self.data[
+            self.get_essential_columns + self.get_priority_score_columns
+        ]._repr_html_()
+
+    @property
+    def get_essential_columns(self):
+        """Returns essential columns for printing data"""
+        columns = [
+            self._col_names.well_id,
+            self._col_names.operator_name,
+            self._col_names.latitude,
+            self._col_names.longitude,
+            self._col_names.age,
+            self._col_names.depth,
+        ]
+        return list(filter(None, columns))
 
     @property
     def column_names(self) -> WellDataColumnNames:

@@ -40,3 +40,15 @@ def raise_exception(msg: str, exception_type: Exception) -> None:
         # if one is configured
         LOGGER.exception(msg)
         raise
+
+
+class MissingDataError(Exception):
+    """Exception to be raised if the required data is missing."""
+
+
+class InputDataError(Exception):
+    """Exception to be raised if the specified input is invalid."""
+
+
+class DataTypeError(Exception):
+    """Exception to be raised if an incorrect data type is encountered"""

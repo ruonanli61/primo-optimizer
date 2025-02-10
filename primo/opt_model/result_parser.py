@@ -17,18 +17,17 @@ from typing import List, Optional, Union
 
 # Installed libs
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 # User-defined libs
 from primo.data_parser import EfficiencyMetrics
 from primo.data_parser.well_data import WellData
 from primo.utils.clustering_utils import distance_matrix
+from primo.utils.raise_exception import MissingDataError
 
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=too-many-instance-attributes
 class Project:
     """
     Class for storing optimal projects
@@ -59,21 +58,7 @@ class Project:
         # DataFrame allows ease of access to flagged wells (columns containing _flag)
         self.well_data = wd._construct_sub_data(index)
         self._col_names = self.well_data.column_names
-        col_names = self._col_names
         self.project_id = project_id
-
-        # Must display essential columns while printing a DataFrame
-        self._essential_cols = [
-            self._col_names.well_id,
-            self._col_names.latitude,
-            self._col_names.longitude,
-            self._col_names.age,
-            self._col_names.depth,
-            self._col_names.priority_score,
-        ]
-        self._priority_score_cols = wd.get_priority_score_columns
-        self._flag_cols = wd.get_flag_columns
-        self.num_wells = len(index)
         # Optimization problem uses million USD. Convert it to USD
         self.plugging_cost = plugging_cost * 1e6
         self.efficiency_score = 0
@@ -81,7 +66,7 @@ class Project:
         self.accessibility_attr = [
             attribute
             for attribute in accessibility_column_attr
-            if hasattr(col_names, attribute)
+            if hasattr(self._col_names, attribute)
         ]
 
     def __iter__(self):
@@ -96,43 +81,68 @@ class Project:
         )
         return msg
 
-    def _check_column_exists(self, col_name):
+    def __contains__(self, well: Union[int, str]):
+        """Checks if a well is contained in the project or not"""
+        # Supporting both index and well id
+        return (
+            well in self.well_data.data.index
+            or well in self.well_data[self.column_names.well_id]
+        )
+
+    def __len__(self):
+        """Returns number of wells in the project"""
+        return len(self.well_data.data)
+
+    def _repr_html(self):
+        """Nicely formats the data in Jupyter notebook"""
+        # pylint: disable = protected-access
+        self.well_data._repr_html_()
+
+    def _get_data_column(self, col_name: str):
         """
-        Checks if a column exists
+        Checks if a column exists. If it exists, it returns the data column.
         """
-        if col_name is None:
-            raise ValueError("The column is not in the welldatacolumns class")
+        # NOTE: `try` is faster than `if`, if we know that the condition
+        # is expected to pass in most of the scenarios. This is known as
+        # "Easier to Ask Forgiveness Than Permission" (EAFP) style.
+        try:
+            return self.well_data[getattr(self._col_names, col_name)]
+        except KeyError as exp:
+            raise MissingDataError(
+                f"{col_name} data is not in the input well data"
+            ) from exp
 
     @property
     def num_wells_near_hospitals(self):
         """Returns number of wells that are near hospitals"""
-        col_name = self._col_names.hospitals
-        self._check_column_exists(col_name)
-        return len(self.well_data[self.well_data[col_name] > 0].index)
+        data_col = self._get_data_column("hospitals")
+        return len(self.well_data[data_col > 0].index)
 
     @property
     def num_wells_near_schools(self):
         """Returns number of wells that are near schools"""
-        col_name = self._col_names.schools
-        self._check_column_exists(col_name)
-        return len(self.well_data[self.well_data[col_name] > 0].index)
+        data_col = self._get_data_column("schools")
+        return len(self.well_data[data_col > 0].index)
+
+    @property
+    def num_wells(self):
+        """Returns the number of wells in the project"""
+        return len(self)
 
     @property
     def average_age(self):
         """
         Returns average age of the wells in the project
         """
-        return self.well_data[self._col_names.age].mean()
+        return self._get_data_column("age").mean()
 
     @property
     def age_range(self):
         """
         Returns the range of the age of the project
         """
-        return (
-            self.well_data[self._col_names.age].max()
-            - self.well_data[self._col_names.age].min()
-        )
+        data_col = self._get_data_column("age")
+        return data_col.max() - data_col.min()
 
     @property
     def dist_range(self):
@@ -147,61 +157,44 @@ class Project:
         """
         Returns the average depth of the project
         """
-        return self.well_data[self._col_names.depth].mean()
+        return self._get_data_column("depth").mean()
 
     @property
     def depth_range(self):
         """
         Returns the range of the depth of the project
         """
-        return (
-            self.well_data[self._col_names.depth].max()
-            - self.well_data[self._col_names.depth].min()
-        )
+        data_col = self._get_data_column("depth")
+        return data_col.max() - data_col.min()
 
     @property
     def elevation_delta(self):
         """
-        Returns the average elevation delta of the project
+        Returns the maximum elevation delta of the project
         """
-        col_name = self._col_names.elevation_delta
-        self._check_column_exists(col_name)
-        return self.well_data[col_name].max()
+        return self._get_data_column("elevation_delta").max()
 
     @property
     def centroid(self):
         """
         Returns the centroid of the project
         """
-        return tuple(
-            np.round(
-                np.mean(
-                    self.well_data.data[
-                        [self._col_names.latitude, self._col_names.longitude]
-                    ].values,
-                    axis=0,
-                ),
-                6,
-            )
-        )
+        cols = [self._col_names.latitude, self._col_names.longitude]
+        return tuple(self.well_data[cols].mean().round(6))
 
     @property
     def dist_to_road(self):
         """
-        Returns the average distance to road for a project
+        Returns the maximum distance to road for a project
         """
-        col_name = self._col_names.dist_to_road
-        self._check_column_exists(col_name)
-        return self.well_data[col_name].max()
+        return self._get_data_column("dist_to_road").max()
 
     @property
     def population_density(self):
         """
-        Returns the average distance to road for a project
+        Returns the maximum population density value for a project
         """
-        col_name = self._col_names.population_density
-        self._check_column_exists(col_name)
-        return self.well_data[col_name].max()
+        return self._get_data_column("population_density").max()
 
     @property
     def column_names(self):
@@ -211,20 +204,11 @@ class Project:
         return self._col_names
 
     @property
-    def essential_cols(self):
-        """
-        Returns the minimal essential/necessary cols associated with a project
-        """
-        return self._essential_cols
-
-    @property
     def num_unique_owners(self):
         """
         Returns the number of well owners for a project
         """
-        col_name = self._col_names.operator_name
-        self._check_column_exists(col_name)
-        return len(set(self.well_data[col_name].values))
+        return len(set(self._get_data_column("operator_name")))
 
     @property
     def impact_score(self):
@@ -297,9 +281,11 @@ class Project:
         """
         Returns the data frame to display in the notebook
         """
-        if self.well_data.config.verify_operator_name:
-            self._essential_cols.insert(1, self._col_names.operator_name)
-        return self.well_data[self._essential_cols]
+        cols = self.well_data.get_essential_columns
+        if hasattr(self._col_names, "priority_score"):
+            cols.append(self._col_names.priority_score)
+
+        return self.well_data[cols]
 
 
 class Campaign:
@@ -307,7 +293,7 @@ class Campaign:
     Represents an optimal campaign that consists of multiple projects.
     """
 
-    # pylint: disable = too-many-arguments
+    # pylint: disable = too-many-arguments, too-many-positional-arguments
     def __init__(
         self,
         wd: WellData,
@@ -344,8 +330,6 @@ class Campaign:
         if opt_model_inputs.config.well_data.config.efficiency_metrics is not None:
             self.opt_model_inputs.compute_efficiency_scaling_factors()
 
-        if efficiency_model_scores is None:
-            efficiency_model_scores = {}
         index = 1
         for cluster, wells in self.clusters_dict.items():
             self.projects[cluster] = Project(
@@ -358,6 +342,14 @@ class Campaign:
 
         self.num_projects = len(self.projects)
         self.efficiency_calculator = EfficiencyCalculator(self, efficiency_model_scores)
+
+    def __iter__(self):
+        """Iterates over all project objects"""
+        return iter(self.projects.values())
+
+    def __len__(self):
+        """Returns the number of projects in the campaign"""
+        return self.num_projects
 
     def get_project_id_by_well_id(self, well_id: str) -> Optional[int]:
         """
@@ -374,7 +366,7 @@ class Campaign:
             The project ID if the well exists in any project; otherwise, None.
         """
         for project_id, project in self.projects.items():
-            if well_id in project.well_data.data[self.wd.column_names.well_id].values:
+            if well_id in project:
                 return project_id
         return None
 
@@ -383,7 +375,7 @@ class Campaign:
             f"The optimal campaign has {self.num_projects} projects.\n"
             f"The total cost of the campaign is ${round(self.total_plugging_cost):,}\n\n"
         )
-        for _, project in self.projects.items():
+        for project in self.projects.values():
             msg += str(project)
             msg += "\n"
 
@@ -394,7 +386,7 @@ class Campaign:
         """
         Returns the total plugging cost of the campaign
         """
-        return sum(project.plugging_cost for _, project in self.projects.items())
+        return sum(project.plugging_cost for project in self.projects.values())
 
     def get_max_value_across_all_projects(self, attribute: str) -> Union[float, int]:
         """
@@ -405,11 +397,15 @@ class Campaign:
         attribute : str
             name of the attribute of interest
         """
-        if not hasattr(next(iter(self.projects.values())), attribute):
+        # Since we expect the attribute to be present in most cases, switching to
+        # the EAFP style described above.
+        try:
+            return max(getattr(project, attribute) for project in self)
+
+        except AttributeError as exp:
             raise AttributeError(
                 "The project does not have the requested attribute: " + attribute
-            )
-        return max(getattr(project, attribute) for _, project in self.projects.items())
+            ) from exp
 
     def get_min_value_across_all_projects(self, attribute: str) -> Union[float, int]:
         """
@@ -421,11 +417,13 @@ class Campaign:
             name of the attribute of interest
 
         """
-        if not hasattr(next(iter(self.projects.values())), attribute):
+        try:
+            return min(getattr(project, attribute) for project in self)
+
+        except AttributeError as exp:
             raise AttributeError(
                 "The project does not have the requested attribute: " + attribute
-            )
-        return min(getattr(project, attribute) for _, project in self.projects.items())
+            ) from exp
 
     def get_max_value_across_all_wells(self, col_name: str) -> Union[float, int]:
         """
@@ -437,7 +435,7 @@ class Campaign:
             name of the column containing the values of interest
 
         """
-        return max(self.wd[col_name].values)
+        return self.wd[col_name].max()
 
     def get_min_value_across_all_wells(self, col_name: str) -> Union[float, int]:
         """
@@ -448,7 +446,7 @@ class Campaign:
         col_name : str
             name of the column containing the values of interest
         """
-        return min(self.wd[col_name].values)
+        return self.wd[col_name].min()
 
     def plot_campaign(self, title: str):
         """
@@ -476,7 +474,7 @@ class Campaign:
         )
         plt.figure()
         ax = plt.gca()
-        for _, project in self.projects.items():
+        for project in self.projects.values():
             ax.scatter(
                 project.well_data[project.column_names.longitude],
                 project.well_data[project.column_names.latitude],
@@ -492,7 +490,7 @@ class Campaign:
         """
         return {
             project.project_id: project.get_well_info_dataframe()
-            for _, project in self.projects.items()
+            for project in self.projects.values()
         }
 
     def get_efficiency_score_project(self, project_id: int) -> float:
@@ -542,7 +540,7 @@ class Campaign:
         """
         # TODO What to do with single well projects
 
-        project_column = [project.project_id for _, project in self.projects.items()]
+        project_column = [project.project_id for project in self.projects.values()]
         first_key = list(self.projects.keys())[0]
         names_attributes = [
             attribute_name
@@ -551,7 +549,7 @@ class Campaign:
         ]
 
         attribute_data = [
-            [getattr(project, attribute) for _, project in self.projects.items()]
+            [getattr(project, attribute) for project in self.projects.values()]
             for attribute in names_attributes
         ]
 
@@ -565,14 +563,11 @@ class Campaign:
             total_weights, accessibility_data = map(
                 list,
                 zip(
-                    *[
-                        project.accessibility_score
-                        for _, project in self.projects.items()
-                    ]
+                    *[project.accessibility_score for project in self.projects.values()]
                 ),
             )
             efficiency_scores = [
-                project.efficiency_score for _, project in self.projects.items()
+                project.efficiency_score for project in self.projects.values()
             ]
 
             data = list(
@@ -588,7 +583,7 @@ class Campaign:
         # if there is data for the accessibility score
         else:
             efficiency_scores = [
-                project.efficiency_score for _, project in self.projects.items()
+                project.efficiency_score for project in self.projects.values()
             ]
             header.append("Efficiency Score [0-100]")
             data = list(zip(project_column, *attribute_data, efficiency_scores))
@@ -606,7 +601,7 @@ class Campaign:
                 project.impact_score,
                 project.efficiency_score,
             ]
-            for _, project in self.projects.items()
+            for project in self.projects.values()
         ]
         header = [
             "Project ID",
@@ -641,7 +636,7 @@ class Campaign:
 
         # add the project data
         start_row = 0
-        for _, project in self.projects.items():
+        for project in self.projects.values():
             wells_df = project.well_data.data[columns_to_export].copy()
             wells_df["Project ID"] = pd.Series(
                 [project.project_id] * len(wells_df), index=wells_df.index
@@ -685,7 +680,7 @@ class EfficiencyCalculator:
     """
 
     def __init__(
-        self, campaign: Campaign, efficiency_model_scores: dict[dict[str, float]]
+        self, campaign: Campaign, efficiency_model_scores: dict[int, dict[str, float]]
     ):
         """
         Constructs the object for all of the efficiency computations for a campaign
@@ -696,7 +691,7 @@ class EfficiencyCalculator:
         campaign : Campaign
             The final campaign for efficiencies to be computed
 
-        efficiency_scores_dict: dict[dict[str, float]]
+        efficiency_scores_dict: dict[int, dict[str, float]]
             Dictionary of efficiency metrics and scores:
             {cluster # : {efficiency_metric : efficiency score}}
 
@@ -715,7 +710,7 @@ class EfficiencyCalculator:
         """
         Computes efficiency attributes for all the projects in the campaign
         """
-        for _, project in self.campaign.projects.items():
+        for project in self.campaign.projects.values():
             LOGGER.debug(
                 f"Computing efficiency scores for project {project.project_id}"
             )
@@ -760,38 +755,6 @@ class EfficiencyCalculator:
                 metric.score_attribute,
                 min(max(score, 0), metric.effective_weight),
             )
-            # if metric.has_inverse_priority:
-            #     setattr(
-            #         project,
-            #         metric.score_attribute,
-            #         (1 - getattr(project, metric.name) / scaling_factor)* metric.effective_weight,
-            #         max(
-            #             0,
-            #             min(
-            #                 1,
-            #                 (
-            #                     (max_value - getattr(project, metric.name))
-            #                     / (max_value - min_value)
-            #                 ),
-            #             ),
-            #         )
-            #         * metric.effective_weight,
-            #     )
-
-            # else:
-            #     setattr(
-            #         project,
-            #         metric.score_attribute,
-            #         max(
-            #             0,
-            #             min(
-            #                 1,
-            #                 (getattr(project, metric.name) - min_value)
-            #                 / (max_value - min_value),
-            #             ),
-            #         )
-            #         * metric.effective_weight,
-            #     )
 
     def compute_overall_efficiency_scores_project(self, project: Project):
         """
@@ -806,13 +769,13 @@ class EfficiencyCalculator:
             f"Computing overall efficiency score for project {project.project_id}"
         )
 
-        if len(self.efficiency_model_scores) > 0:
+        if self.efficiency_model_scores is not None:
             project.update_efficiency_score(
                 sum(
                     value
-                    for _, value in self.efficiency_model_scores[
+                    for value in self.efficiency_model_scores[
                         project.project_id
-                    ].items()
+                    ].values()
                 )
             )
             return
@@ -836,14 +799,14 @@ class EfficiencyCalculator:
         """
         Computes the overall efficiency score for all projects in a campaign
         """
-        for _, project in self.campaign.projects.items():
+        for project in self.campaign.projects.values():
             self.compute_overall_efficiency_scores_project(project)
 
     def compute_efficiency_scores(self):
         """
         Function that wraps all the methods needed to compute efficiency scores for the campaign
         """
-        if len(self.efficiency_model_scores) == 0:
+        if self.efficiency_model_scores is None:
             self.compute_efficiency_attributes_for_all_projects()
         self.compute_overall_efficiency_scores_campaign()
 

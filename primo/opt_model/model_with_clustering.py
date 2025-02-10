@@ -586,13 +586,7 @@ class PluggingCampaignModel(ConcreteModel):
                 )
 
         wd = self.model_inputs.config.well_data
-        return Campaign(
-            wd,
-            optimal_campaign,
-            plugging_cost,
-            self.model_inputs,
-            efficiency_scores_projects,
-        )
+        return Campaign(wd, optimal_campaign, plugging_cost, self.model_inputs)
 
     def get_solution_pool(self, solver):
         """

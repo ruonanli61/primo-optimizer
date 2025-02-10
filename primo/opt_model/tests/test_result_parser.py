@@ -24,6 +24,7 @@ from primo.data_parser.metric_data import EfficiencyMetrics, ImpactMetrics
 from primo.data_parser.well_data import WellData
 from primo.opt_model.model_options import OptModelInputs
 from primo.opt_model.result_parser import Campaign, export_data_to_excel
+from primo.utils.raise_exception import MissingDataError
 
 MOBILIZATION_COST = {1: 120000, 2: 210000, 3: 280000, 4: 350000}
 for n_wells in range(5, 10 + 1):
@@ -445,7 +446,10 @@ def get_eff_metrics_accessibility_fixture():
 
 def test_check_column_exists(get_project):
     get_project.column_names.hospitals = None
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        MissingDataError,
+        match="hospitals data is not in the input well data",
+    ):
         print(get_project.num_wells_near_hospitals)
 
 
@@ -479,7 +483,10 @@ def test_project_attributes_minimal(get_minimal_campaign):
     project = get_minimal_campaign.projects[1]
 
     # checking for missing attributes
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        MissingDataError,
+        match="dist_to_road data is not in the input well data",
+    ):
         print(project.dist_to_road)
 
 
@@ -500,8 +507,6 @@ def test_update_efficiency_score(get_project):
 def test_get_well_info_data_frame(get_project):
     project = get_project
     well_data = project.get_well_info_dataframe()
-    for col in project.essential_cols:
-        assert col in well_data.columns
     assert (
         "Violation [Yes/No]" == project.column_names.violation
         and "Violation [Yes/No]" not in well_data.columns
@@ -824,8 +829,8 @@ def test_get_efficiency_metrics(get_efficiency_calculator):
     )
 
 
-def test_export_data_to_excel(get_campaign):
-    output_file_path = "export_data_test.xlsx"
+def test_export_data_to_excel(tmp_path, get_campaign):
+    output_file_path = tmp_path / "export_data_test.xlsx"
     campaigns = [get_campaign]
     campaign_labels = ["export data test"]
     export_data_to_excel(output_file_path, campaigns, campaign_labels)
