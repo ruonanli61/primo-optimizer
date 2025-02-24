@@ -42,7 +42,7 @@ from primo.utils.census_utils import (
 from primo.utils.raise_exception import raise_exception
 
 LOGGER = logging.getLogger(__name__)
-
+pd.options.display.precision = 2
 CONFIG = data_config()
 
 OWNER_WELL_COLUMN_NAME = "Owner Well-Count"
@@ -192,12 +192,14 @@ class WellData:
     def get_essential_columns(self):
         """Returns essential columns for printing data"""
         columns = [
+            getattr(self._col_names, "well_rank", None),
             self._col_names.well_id,
             self._col_names.operator_name,
             self._col_names.latitude,
             self._col_names.longitude,
             self._col_names.age,
             self._col_names.depth,
+            getattr(self._col_names, "priority_score", None),
         ]
         return list(filter(None, columns))
 
@@ -1169,9 +1171,35 @@ class WellData:
             "Priority Score [0-100]",
             self.data[self.get_priority_score_columns].sum(axis=1),
         )
-
+        self.add_well_rank()
         self.check_data_in_range("Priority Score [0-100]", 0.0, 100.0)
         LOGGER.info("Completed the calculation of priority scores.")
+
+    def add_well_rank(self):
+        """
+        Obtain rank of wells based on the priority score.
+        """
+        if hasattr(self._col_names, "well_rank"):
+            LOGGER.info("Well rank already computed.")
+            return
+
+        if hasattr(self._col_names, "priority_score"):
+            sorted_rank = (
+                self.data["Priority Score [0-100]"]
+                .rank(method="min", ascending=False)
+                .astype(int)
+            )
+            self.add_new_column_ordered(
+                "well_rank",
+                "Well Rank",
+                sorted_rank,
+            )
+        else:
+            LOGGER.warning(
+                "Priority scores are not calculated. Please use the "
+                "compute_priority_scores method before computing well rank."
+            )
+            return
 
     def save_to_file(self, filename: str):
         """

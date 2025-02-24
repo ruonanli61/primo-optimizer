@@ -282,9 +282,6 @@ class Project:
         Returns the data frame to display in the notebook
         """
         cols = self.well_data.get_essential_columns
-        if hasattr(self._col_names, "priority_score"):
-            cols.append(self._col_names.priority_score)
-
         return self.well_data[cols]
 
 
@@ -293,7 +290,7 @@ class Campaign:
     Represents an optimal campaign that consists of multiple projects.
     """
 
-    # pylint: disable = too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         wd: WellData,
