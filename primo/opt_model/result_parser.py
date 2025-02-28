@@ -743,6 +743,13 @@ class EfficiencyCalculator:
                 score = (
                     getattr(project, metric.name) / scaling_factor
                 ) * metric.effective_weight
+            elif metric.name == "num_unique_owners":
+                if scaling_factor == 1:
+                    score = metric.effective_weight
+                else:
+                    score = (
+                        1 - (getattr(project, metric.name) - 1) / (scaling_factor - 1)
+                    ) * metric.effective_weight
             else:
                 score = (
                     1 - getattr(project, metric.name) / scaling_factor

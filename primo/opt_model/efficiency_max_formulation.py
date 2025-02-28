@@ -17,12 +17,82 @@ import logging
 # Installed libs
 import pandas as pd
 from pyomo.core.base.block import BlockData, declare_custom_block
-from pyomo.environ import NonNegativeReals, Set, Var
+from pyomo.environ import Binary, Constraint, NonNegativeReals, Set, Var
 
 # User-defined libs
 from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
+from primo.utils.raise_exception import MissingDataError, raise_exception
 
 LOGGER = logging.getLogger(__name__)
+
+
+def build_num_unique_owners_model(m):
+    """
+    Builds constraints and variables to track the number of unique well owners
+    in the optimization model.
+
+    Parameters
+    ----------
+    m : pyomo.environ.Block
+        The model block where the unique owner constraints and variables
+        will be added.
+    """
+
+    cm = m.parent_block().parent_block()
+    wd = cm.parent_block().model_inputs.config.well_data
+    if wd.col_names.operator_name is None:
+        raise_exception("Operator Name column not available", MissingDataError)
+
+    operator_list = (
+        wd[wd.col_names.operator_name].loc[list(cm.set_wells)].unique().tolist()
+    )
+
+    m.owner_dict = {owner: [] for owner in operator_list}
+    for well in cm.set_wells:
+        m.owner_dict[wd.data.loc[well, wd.col_names.operator_name]].append(well)
+    # {Owner 1: [w1, w2, w3, ....]
+    # Key => Owner name, Value => index
+
+    m.set_owners = Set(
+        initialize=operator_list,
+        doc="set of unique owners in cluster c",
+    )
+
+    m.select_owner = Var(
+        m.set_owners,
+        within=Binary,
+        doc="Binary variable to track if an owner's well is selected",
+    )
+
+    @m.Constraint(
+        cm.set_wells,
+        doc="select_owner variable is set to 1 if well is selected",
+    )
+    def owner_selection_constraint(_, w):
+        return (
+            cm.select_well[w] <= m.select_owner[wd[wd.col_names.operator_name].loc[w]]
+        )
+
+    m.num_owners_chosen = Var(
+        within=NonNegativeReals,
+        doc="Variable to keep track of total number of unique owners",
+    )
+
+    m.num_owners_constraint = Constraint(
+        expr=(
+            m.num_owners_chosen == sum(m.select_owner[owner] for owner in m.set_owners)
+        ),
+        doc="Constraint to calculate number of unique owners chosen in a project",
+    )
+
+    @m.Constraint(
+        m.set_owners,
+        doc="Set select_owner variable to 0 if no well of that owner is selected in a project",
+    )
+    def do_not_select_owner(_, owner):
+        return m.select_owner[owner] <= sum(
+            m.cluster_model.select_well[w] for w in m.owner_dict[owner]
+        )
 
 
 @declare_custom_block("MaxFormulationBlock")
@@ -38,6 +108,13 @@ class MaxFormulationBlockData(BlockData):
         """
         return self.parent_block().parent_block()
 
+    @property
+    def plugging_campaign_model(self):
+        """
+        Returns a pointer to the plugging campaign model
+        """
+        return self.parent_block().parent_block().parent_block()
+
     def compute_metric_score(
         self,
         weight: int,
@@ -51,8 +128,11 @@ class MaxFormulationBlockData(BlockData):
         # pylint: disable = attribute-defined-outside-init
         self.score = Var(
             domain=NonNegativeReals,
-            bounds=(0, weight),
             doc="Score variable for this efficiency metric",
+        )
+        self.score_upper_bound = Constraint(
+            expr=self.score <= weight * self.cluster_model.select_cluster,
+            doc="Set score to 0 if cluster is not selected",
         )
         well_vars = self.cluster_model.select_well
         select_cluster = self.cluster_model.select_cluster
@@ -86,9 +166,24 @@ class MaxFormulationBlockData(BlockData):
                 )
 
         elif metric_type == "num_unique_owners":
-            LOGGER.warning(
-                "Efficiency metric num_unique_owners is not supported currently"
-            )
+
+            build_num_unique_owners_model(self)
+
+            if scaling_factor == 1:
+
+                @self.Constraint()
+                def calculate_score(_):
+                    return self.num_owners_chosen == self.cluster_model.select_cluster
+
+            else:
+
+                @self.Constraint()
+                def calculate_score(blk):
+                    return blk.score <= weight * (
+                        select_cluster
+                        - (self.num_owners_chosen - select_cluster)
+                        / (scaling_factor - 1)
+                    )
 
 
 def build_cluster_efficiency_model(eff_blk):

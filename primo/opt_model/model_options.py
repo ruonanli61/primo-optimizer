@@ -28,7 +28,12 @@ from pyomo.common.config import (
 )
 
 # User-defined libs
-from primo.data_parser.default_data import WELL_BASED_METRICS, WELL_PAIR_METRICS
+from primo.data_parser.default_data import (
+    DEFAULT_MAX_NUM_UNIQUE_OWNERS,
+    DEFAULT_MAX_NUM_WELLS,
+    WELL_BASED_METRICS,
+    WELL_PAIR_METRICS,
+)
 from primo.data_parser.well_data import WellData
 from primo.opt_model.model_with_clustering import PluggingCampaignModel
 from primo.utils import get_solver
@@ -562,6 +567,7 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         )
 
     def compute_efficiency_scaling_factors(self):
+        # pylint: disable=too-many-branches
         """
         Checks whether scaling factors for efficiency metrics are provided by
         the user or not. If not, computes the scaling factors using the entire
@@ -592,11 +598,15 @@ class OptModelInputs:  # pylint: disable=too-many-instance-attributes
         if config.max_num_wells is None and eff_weights.num_wells > 0:
             if config.max_wells_in_project is not None:
                 config.max_num_wells = config.max_wells_in_project
-            set_scaling_factor("num_wells", 25)
+            else:
+                set_scaling_factor("num_wells", DEFAULT_MAX_NUM_WELLS)
 
         # Setting a scaling factor for num_unique_owners metric
         if config.max_num_unique_owners is None and eff_weights.num_unique_owners > 0:
-            set_scaling_factor("num_unique_owners", 5)
+            if config.max_wells_in_project is not None:
+                set_scaling_factor("num_unique_owners", config.max_wells_in_project)
+            else:
+                set_scaling_factor("num_unique_owners", DEFAULT_MAX_NUM_UNIQUE_OWNERS)
 
         for metric in WELL_BASED_METRICS:
             if (

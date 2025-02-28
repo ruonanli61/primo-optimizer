@@ -26,6 +26,9 @@ CONVERSION_FACTOR = 5.614583  # convert Bbl of oil to Mcf of gas
 BING_MAPS_BASE_URL = "http://dev.virtualearth.net/REST/V1/Routes/Driving"
 # Fixed start coordinates in elevation utility to get nearest road point
 START_COORDINATES = (40.44, -79.94)
+# default value for max num wells and max num unique owners scaling factor in efficiency model
+DEFAULT_MAX_NUM_WELLS = 25
+DEFAULT_MAX_NUM_UNIQUE_OWNERS = 5
 
 # CEJST data available on https://screeningtool.geoplatform.gov
 # relies on Census Tracts from 2010
