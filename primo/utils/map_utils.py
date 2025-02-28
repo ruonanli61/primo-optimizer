@@ -173,7 +173,16 @@ class VisualizeData:
         map_obj = folium.Map(location=map_center, zoom_start=8.2)
 
         if shapefile and self.state_shapefile is not None:
-            folium.GeoJson(self.state_shapefile).add_to(map_obj)
+            folium.GeoJson(
+                self.state_shapefile,
+                style_function=lambda feature: {
+                    "fillColor": "#add8e6",
+                    "color": "black",
+                    "weight": 2,
+                    "dashArray": "7, 7",
+                    "opacity": 1.0,
+                },
+            ).add_to(map_obj)
 
             # Add county names as markers
             for county in self.state_shapefile.itertuples():
@@ -190,16 +199,16 @@ class VisualizeData:
                     )
 
                 centroid = [county.geometry.centroid.y, county.geometry.centroid.x]
+                county_name = county_name.lower().capitalize()
                 folium.map.Marker(
                     location=centroid,
                     icon=folium.DivIcon(
                         html=(
-                            f'<div style="font-size: 11pt; color: black; text-align: center; '
-                            f'font-weight: bold;">{county_name}</div>'
+                            f'<div style="font-size: 11pt; color: black; text-align: left; '
+                            f'font-weight: 600; opacity: 0.6">{county_name}</div>'
                         )
                     ),
                 ).add_to(map_obj)
-
         # Create legend
         if legend is True:
             gas_legend = '<i style="color:red">o - Gas Well</i>'

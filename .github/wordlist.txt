@@ -9,6 +9,7 @@ Dataclass
 DataFrame
 DAC
 ExcelWriter
+Folium
 GeoDataFrame
 Geopandas
 Gurobi
@@ -60,6 +61,7 @@ dtype
 dunder
 env
 fixme
+folium
 geopandas
 geopoint
 geospatial
