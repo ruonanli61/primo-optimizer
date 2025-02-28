@@ -99,6 +99,7 @@ def get_random_lat_long_bounds_fixture():
     return (-113, -83, 33, 41)
 
 
+@pytest.mark.api
 def test_dac_score(get_column_names, get_random_generator, get_random_lat_long_bounds):
     """Test DAC score calculation"""
 
