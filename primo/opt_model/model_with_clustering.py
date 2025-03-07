@@ -29,6 +29,10 @@ from pyomo.environ import (
     Var,
     maximize,
 )
+from pyomo.util.infeasible import (
+    find_infeasible_constraints,
+    log_infeasible_constraints,
+)
 
 # User-defined libs
 # pylint: disable=no-name-in-module, import-error
@@ -637,3 +641,8 @@ class PluggingCampaignModel(ConcreteModel):
             )
 
         return solution_pool
+
+    def feasibility_check(self):
+        m = self
+
+        log_infeasible_constraints(m)
